@@ -1,0 +1,58 @@
+# Compiled Java files (generated during build)
+*.class
+
+# Log files (often generated during runtime)
+*.log
+
+# Package Files (build artifacts, should not be in Git)
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# JVM crash logs
+hs_err_pid*
+
+# Standard Maven build output directory
+target/
+# Standard Gradle build output directory (include in case you switch)
+build/
+# Common output directory for some IDEs/builds
+out/
+
+# IDE specific files (avoids committing user-specific settings)
+# IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+# Eclipse
+.project
+.classpath
+.settings/
+# NetBeans
+*.nbproject/
+nbproject/private/
+build.properties
+nbbuild.xml
+dist/
+nbdist/
+.nb-gradle/
+# Visual Studio Code
+.vscode/
+
+# Vaadin / Frontend specific (generated during Vaadin build process)
+node/
+node_modules/
+frontend/generated/
+package-lock.json
+# Generated webpack configurations
+webpack.config.js
+webpack.generated.js
+
+# Operating System specific temporary/metadata files
+.DS_Store
+Thumbs.db
