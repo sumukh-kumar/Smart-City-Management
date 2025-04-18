@@ -6,6 +6,7 @@ import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.H2;
+import com.vaadin.flow.component.html.Paragraph; // Import Paragraph
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
@@ -21,6 +22,7 @@ public class TrafficManagementView extends VerticalLayout {
     private Grid<TrafficSignal> grid = new Grid<>(TrafficSignal.class);
     private Button simulateButton;
     private Button backButton;
+    private Paragraph statusMessage; // Add a field for the status message
 
     public TrafficManagementView() {
         // Get the singleton instance of the service
@@ -40,6 +42,10 @@ public class TrafficManagementView extends VerticalLayout {
 
         add(new H2("Traffic Management System"));
 
+        // Initialize the status message paragraph
+        statusMessage = new Paragraph("Click 'Simulate Traffic Change' to see updates.");
+        statusMessage.getStyle().set("font-style", "italic"); // Optional styling
+
         configureGrid();
         configureButtons();
 
@@ -47,7 +53,8 @@ public class TrafficManagementView extends VerticalLayout {
         HorizontalLayout buttonLayout = new HorizontalLayout(simulateButton, backButton);
         buttonLayout.setSpacing(true);
 
-        VerticalLayout content = new VerticalLayout(grid, buttonLayout);
+        // Add the status message to the content layout
+        VerticalLayout content = new VerticalLayout(grid, statusMessage, buttonLayout);
         content.setAlignItems(Alignment.CENTER);
         content.getStyle()
            .set("background-color", "rgba(255, 255, 255, 0.8)")
@@ -74,7 +81,12 @@ public class TrafficManagementView extends VerticalLayout {
     private void configureButtons() {
         simulateButton = new Button("Simulate Traffic Change");
         simulateButton.addClickListener(e -> {
-            trafficService.simulateTrafficChange(); // Call the service method
+            String message = trafficService.simulateTrafficChange(); // Call the service method and get the message
+            if (message != null) {
+                statusMessage.setText(message); // Update the paragraph text
+            } else {
+                statusMessage.setText("No signals available to simulate.");
+            }
             updateGrid(); // Refresh the grid to show changes
         });
 
