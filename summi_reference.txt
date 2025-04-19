@@ -1,0 +1,6 @@
+if error do this mvn dependency:copy-dependencies
+Compile
+cd "c:\Users\sumuk\OneDrive\Desktop\Pes Notes\sem-6\ooad_proj\smart-city-management"
+javac -cp "target/dependency/*" data_gen/UtilityDataGenerator.java
+run
+java -cp "data_gen;target\dependency\*" UtilityDataGenerator
