@@ -60,3 +60,5 @@ webpack.generated.js
 # Operating System specific temporary/metadata files
 .DS_Store
 Thumbs.db
+
+summi_reference.txt
