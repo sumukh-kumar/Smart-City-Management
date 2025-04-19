@@ -18,8 +18,12 @@ hs_err_pid*
 
 # Standard Maven build output directory
 target/
-# Standard Gradle build output directory (include in case you switch)
+# Standard Gradle build output directory
 build/
+# Gradle user home (usually not in project, but good practice)
+.gradle/
+# Gradle Wrapper generated files
+gradle/wrapper/gradle-wrapper.jar
 # Common output directory for some IDEs/builds
 out/
 
