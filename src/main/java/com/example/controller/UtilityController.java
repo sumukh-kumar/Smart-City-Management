@@ -1,76 +1,74 @@
-package com.example.controller; // New package for controllers
+package com.example.controller;
 
-import com.example.UtilityManagementView; // Import View
-import com.example.model.PowerReading;    // Import Model structure
-// Update the import for UtilityService to the 'model' package
+import com.example.UtilityManagementView;
+import com.example.model.PowerReading;
 import com.example.model.UtilityService;
-
-import com.vaadin.flow.component.notification.Notification; // Import Notification
 
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 
-// Controller class linking View and Model
 public class UtilityController {
 
-    private final UtilityService model;
+    private final UtilityService service;
     private final UtilityManagementView view;
 
-    public UtilityController(UtilityService model, UtilityManagementView view) {
-        this.model = model;
+    public UtilityController(UtilityService service, UtilityManagementView view) {
+        this.service = service;
         this.view = view;
 
-        // Attach event listeners (Controller logic) to View components
-        this.view.addTrackButtonListener(event -> handleTrackAction());
-        this.view.addReportButtonListener(event -> handleReportAction());
+        // Attach listeners
+        this.view.addTrackButtonListener(e -> handleTrackButtonClick());
+        this.view.addReportButtonListener(e -> handleReportButtonClick());
+        // Attach listener for the new delete button
+        this.view.addDeleteButtonListener(e -> handleDeleteButtonClick());
     }
 
-    // --- Event Handling Logic ---
-
-    /**
-     * Handles the action when the track button is clicked.
-     * Fetches latest reading from the model and updates the view.
-     */
-    private void handleTrackAction() {
-        Optional<PowerReading> latestReadingOpt = model.getLatestReading(); // Interact with Model
+    private void handleTrackButtonClick() {
+        // Remove logging
+        // System.out.println("DEBUG: handleTrackButtonClick called.");
+        Optional<PowerReading> latestReadingOpt = service.getLatestReading();
+        // Remove logging
+        // System.out.println("DEBUG: latestReadingOpt.isPresent() = " + latestReadingOpt.isPresent());
 
         if (latestReadingOpt.isPresent()) {
-            PowerReading latestReading = latestReadingOpt.get();
-            String status = String.format("Latest Reading (%s):\n - Power Consumed: %.2f kWh\n - Fault Detected: %s",
-                    latestReading.getDate().format(DateTimeFormatter.ISO_DATE),
-                    latestReading.getPowerConsumed(),
-                    latestReading.isFaultDetected() ? "YES" : "NO");
-
-            view.setTrackingStatus(status); // Update View
-
-            // Optionally, the controller can also trigger UI feedback like notifications
-            if (latestReading.isFaultDetected()) {
-                Notification.show("ALERT: Fault detected in the latest power reading!", 5000, Notification.Position.TOP_CENTER);
-            } else {
-                Notification.show("Tracking updated. No faults detected.", 2000, Notification.Position.BOTTOM_START);
-            }
+            PowerReading reading = latestReadingOpt.get();
+            // Remove logging
+            // System.out.println("DEBUG: Latest Reading Found: ID=" + reading.getId() + ", Date=" + reading.getDate());
+            String status = String.format(
+                "Latest Reading (ID: %d, Date: %s):\n - Power Consumed: %.2f kWh\n - Fault Detected: %s",
+                reading.getId(),
+                // Correct the method call here to use getDate()
+                reading.getDate().format(DateTimeFormatter.ISO_DATE),
+                reading.getPowerConsumed(),
+                reading.isFaultDetected() ? "YES" : "NO"
+            );
+            view.setTrackingStatus(status);
         } else {
-            view.setTrackingStatus("No power data available."); // Update View
-            Notification.show("Could not retrieve tracking data.", 3000, Notification.Position.MIDDLE);
+            // Remove logging
+            // System.out.println("DEBUG: No latest reading found by service.");
+            view.setTrackingStatus("No data available yet.");
         }
     }
 
-    /**
-     * Handles the action when the report button is clicked.
-     * Generates the report using the model and updates the view.
-     */
-    private void handleReportAction() {
-        YearMonth lastMonth = YearMonth.now().minusMonths(1);
-        String report = model.generateMonthlyReport(lastMonth); // Interact with Model
+    private void handleReportButtonClick() {
+        // Generate report for the previous month for demonstration
+        YearMonth monthToReport = YearMonth.now().minusMonths(1);
+        String report = service.generateMonthlyReport(monthToReport);
+        view.setReportContent(report);
+    }
 
-        view.setReportContent(report); // Update View
+    // --- New Handler Method for Delete Button ---
+    private void handleDeleteButtonClick() {
+        // Call the service method to perform deletion
+        String resultMessage = service.deleteReadingsBeforeLatestMonth();
 
-        // Optional notification feedback
-        if (!report.startsWith("No data available") && !report.startsWith("Error:")) {
-             Notification.show("Monthly report generated for " + lastMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy")), 3000, Notification.Position.BOTTOM_START);
-        } else {
-             Notification.show(report, 3000, Notification.Position.MIDDLE); // Show error/no data message
-        }
+        // Show the result to the user via a notification
+        // Check if the message indicates an error
+        boolean isError = resultMessage.toLowerCase().startsWith("error");
+        view.showNotification(resultMessage, isError);
+
+        // Optionally, refresh the tracking status or report if needed after deletion
+        // handleTrackButtonClick(); // Uncomment if you want to refresh latest reading display
     }
 }

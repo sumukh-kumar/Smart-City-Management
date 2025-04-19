@@ -13,12 +13,12 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAdjusters; // Import for finding first day of month
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 // Remove unused imports related to placeholder data
 // import java.util.Random;
-import java.util.stream.Collectors;
 
 // Import Dotenv
 import io.github.cdimascio.dotenv.Dotenv;
@@ -234,6 +234,61 @@ public class UtilityService {
         }
         return faultReadings;
     }
+
+    // --- New Method for Deleting Old Data ---
+
+    /**
+     * Deletes all utility readings recorded before the start of the month
+     * corresponding to the most recent reading date in the database.
+     *
+     * @return A string message indicating the result (success with count or error).
+     */
+    public String deleteReadingsBeforeLatestMonth() {
+        String findLatestDateSql = "SELECT MAX(reading_date) FROM " + TABLE_NAME;
+        String deleteSql = "DELETE FROM " + TABLE_NAME + " WHERE reading_date < ?";
+        LocalDate latestDate = null;
+
+        // Step 1: Find the latest date in the table
+        try (Connection conn = getConnection();
+             PreparedStatement pstmtLatest = conn.prepareStatement(findLatestDateSql);
+             ResultSet rs = pstmtLatest.executeQuery()) {
+
+            if (rs.next()) {
+                java.sql.Date sqlDate = rs.getDate(1);
+                if (sqlDate != null) {
+                    latestDate = sqlDate.toLocalDate();
+                } else {
+                    return "No data found in the table. Nothing to delete.";
+                }
+            } else {
+                 return "No data found in the table. Nothing to delete.";
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace(); // Log error
+            return "Error finding the latest date: " + e.getMessage();
+        }
+
+        // Step 2: Calculate the first day of the month for the latest date
+        LocalDate firstDayOfLatestMonth = latestDate.with(TemporalAdjusters.firstDayOfMonth());
+
+        // Step 3: Delete records before that date
+        try (Connection conn = getConnection();
+             PreparedStatement pstmtDelete = conn.prepareStatement(deleteSql)) {
+
+            pstmtDelete.setDate(1, java.sql.Date.valueOf(firstDayOfLatestMonth));
+            int rowsAffected = pstmtDelete.executeUpdate();
+
+            return String.format("Successfully deleted %d record(s) from before %s.",
+                                 rowsAffected,
+                                 firstDayOfLatestMonth.format(DateTimeFormatter.ISO_DATE));
+
+        } catch (SQLException e) {
+            e.printStackTrace(); // Log error
+            return "Error deleting old records: " + e.getMessage();
+        }
+    }
+
 
     // Example: Update operation (Mark a fault as acknowledged - requires adding 'fault_acknowledged' column to DB)
     /*
