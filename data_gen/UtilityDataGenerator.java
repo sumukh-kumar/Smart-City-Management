@@ -3,7 +3,9 @@
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet; // <-- Add import for ResultSet
 import java.sql.SQLException;
+import java.sql.Statement; // <-- Add import for Statement
 import java.time.LocalDate;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
@@ -57,11 +59,12 @@ public class UtilityDataGenerator {
 
 
         Random random = new Random();
-        // Start simulation date remains the same logic
-        LocalDate currentDate = LocalDate.now().minusMonths(3);
+        // Remove the initial assignment here, we'll set it after checking the DB
+        // LocalDate currentDate = LocalDate.now().minusMonths(3);
+        LocalDate currentDate; // Declare currentDate
 
         System.out.println("Starting utility data generator...");
-        System.out.println("Connecting to database: " + dbUrl); // Use loaded variable
+        System.out.println("Connecting to database: " + dbUrl);
 
         // Load the MySQL JDBC driver
         try {
@@ -75,10 +78,31 @@ public class UtilityDataGenerator {
         // SQL Statements remain the same, using loaded tableName
         String insertSql = "INSERT INTO " + tableName + " (reading_date, power_consumed, fault_detected) VALUES (?, ?, ?)";
         String deleteSql = "DELETE FROM " + tableName + " WHERE reading_date < DATE_SUB(CURDATE(), INTERVAL 1 YEAR)";
+        String latestDateSql = "SELECT MAX(reading_date) AS latest_date FROM " + tableName; // <-- Query to get the latest date
 
-
-        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword)) { // Use loaded variables
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword)) {
             System.out.println("Database connection successful.");
+
+            // --- Determine the starting date ---
+            try (Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery(latestDateSql)) {
+                if (rs.next() && rs.getDate("latest_date") != null) {
+                    LocalDate latestDateFromDb = rs.getDate("latest_date").toLocalDate();
+                    currentDate = latestDateFromDb.plusDays(1); // Start from the day after the latest entry
+                    System.out.println("Found latest date in DB: " + latestDateFromDb + ". Starting generation from: " + currentDate);
+                } else {
+                    // Table is empty or latest date is null, use default start date
+                    currentDate = LocalDate.now().minusMonths(3);
+                    System.out.println("No existing data found or table empty. Starting generation from default date: " + currentDate);
+                }
+            } catch (SQLException e) {
+                System.err.println("Error querying for latest date. Using default start date.");
+                e.printStackTrace();
+                currentDate = LocalDate.now().minusMonths(3); // Fallback to default on error
+            }
+            // --- End of starting date determination ---
+
+
             conn.setAutoCommit(false); // Use transactions
 
             try (PreparedStatement insertStmt = conn.prepareStatement(insertSql);
@@ -86,6 +110,7 @@ public class UtilityDataGenerator {
 
                 int deleteCounter = 0;
 
+                // The loop now starts with the correctly determined currentDate
                 while (true) {
                     // ... (data generation logic remains the same) ...
                     double dailyConsumption = MIN_POWER + random.nextDouble() * MAX_POWER_RANGE;
@@ -114,12 +139,18 @@ public class UtilityDataGenerator {
 
                     // ... (move to next day and sleep remains the same) ...
                     currentDate = currentDate.plusDays(1);
-                    TimeUnit.SECONDS.sleep(1);
+                    TimeUnit.SECONDS.sleep(1); // Keep the sleep interval
 
                 }
             } catch (SQLException e) {
                 System.err.println("Error during statement execution. Rolling back transaction.");
-                conn.rollback();
+                if (conn != null) { // Check if conn is null before rollback
+                    try {
+                        conn.rollback();
+                    } catch (SQLException ex) {
+                        System.err.println("Error during rollback: " + ex.getMessage());
+                    }
+                }
                 e.printStackTrace();
             } catch (InterruptedException e) {
                 System.err.println("Data generator interrupted.");
