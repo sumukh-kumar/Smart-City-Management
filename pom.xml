@@ -55,6 +55,13 @@
             <!-- Use the appropriate version -->
             <version>8.0.33</version> <!-- Or a newer compatible version -->
         </dependency>
+
+        <!-- Add java-dotenv dependency -->
+        <dependency>
+            <groupId>io.github.cdimascio</groupId>
+            <artifactId>java-dotenv</artifactId>
+            <version>5.2.2</version> <!-- Use the latest appropriate version -->
+        </dependency>
     </dependencies>
 
     <build>

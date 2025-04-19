@@ -4,27 +4,79 @@ package com.example.model;
 // PowerReading is now in the same package, no import needed
 // import com.example.model.PowerReading; // Remove or comment out this line
 
+// Import necessary SQL classes
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Random;
+// Remove unused imports related to placeholder data
+// import java.util.Random;
 import java.util.stream.Collectors;
 
-// Service class to handle data and business logic
-// Now resides in the 'model' package
+// Import Dotenv
+import io.github.cdimascio.dotenv.Dotenv;
+// Keep the import for DotenvException for now, even if commented out below
+// import io.github.cdimascio.dotenv.DotenvException;
+
+
 public class UtilityService {
 
-    // Placeholder data storage - moved from View
-    private List<PowerReading> placeholderData;
+    // --- Load Environment Variables ---
+    private static final Dotenv dotenv;
+    private static final String DB_URL;
+    private static final String DB_USER;
+    private static final String DB_PASSWORD;
+    private static final String TABLE_NAME;
 
-    // Simulate a singleton pattern or use Spring @Service later
+    static {
+        try {
+            // Load .env file. Assumes the app runs with project root as working directory.
+            dotenv = Dotenv.configure().ignoreIfMissing().load(); // ignoreIfMissing might be safer for deployment
+
+            DB_URL = dotenv.get("DB_URL");
+            DB_USER = dotenv.get("DB_USER");
+            DB_PASSWORD = dotenv.get("DB_PASSWORD");
+            TABLE_NAME = dotenv.get("DB_TABLE");
+
+            // Basic validation
+            if (DB_URL == null || DB_USER == null || DB_PASSWORD == null || TABLE_NAME == null) {
+                 throw new RuntimeException("Error: One or more required environment variables (DB_URL, DB_USER, DB_PASSWORD, DB_TABLE) are missing. Check .env file or system environment.");
+            }
+
+            // Load the MySQL JDBC driver once during class loading
+            Class.forName("com.mysql.cj.jdbc.Driver");
+
+        } catch (/*DotenvException*/ RuntimeException e) { // Temporarily catch RuntimeException
+             // Check if the cause is DotenvException if needed, or just log generally
+             System.err.println("Error during static initialization (potentially .env loading): " + e.getMessage());
+             e.printStackTrace(); // Print stack trace to see original exception
+             throw new RuntimeException("Error during static initialization.", e); // Re-throw
+        } catch (ClassNotFoundException e) {
+            // In a real app, handle this more gracefully (logging, custom exception)
+            throw new RuntimeException("Error: MySQL JDBC Driver not found.", e);
+        } catch (Exception e) { // Add a general catch-all just in case
+            System.err.println("Unexpected error during static initialization: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Unexpected error during static initialization.", e);
+        }
+    }
+
+
+    // Remove placeholder data storage
+    // private List<PowerReading> placeholderData;
+
+    // Keep singleton pattern for now as views might depend on it
     private static UtilityService instance;
 
     private UtilityService() {
-        generatePlaceholderData();
+        // Constructor is now empty, initialization happens in static block
     }
 
     public static synchronized UtilityService getInstance() {
@@ -34,56 +86,110 @@ public class UtilityService {
         return instance;
     }
 
-    // Data generation logic - moved from View
-    private void generatePlaceholderData() {
-        placeholderData = new ArrayList<>();
-        Random random = new Random();
-        LocalDate startDate = LocalDate.now().minusMonths(2); // Start data from 2 months ago
-        LocalDate endDate = LocalDate.now();
+    // Remove data generation logic
+    // private void generatePlaceholderData() { ... }
 
-        for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
-            double dailyConsumption = 10 + random.nextDouble() * 5; // Random consumption between 10 and 15 kWh
-            boolean fault = random.nextInt(100) < 5; // 5% chance of a fault
-            placeholderData.add(new PowerReading(date, dailyConsumption, fault));
-        }
-        // In a real app, this would fetch from a database (e.g., using JDBC/JPA)
+
+    // Helper method to get a database connection
+    private Connection getConnection() throws SQLException {
+        // Use the loaded static final variables
+        return DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
     }
 
-    // --- Business Logic Methods ---
+
+    // --- Business Logic Methods (Updated for DB) ---
 
     /**
-     * Gets the latest power reading.
+     * Gets the latest power reading from the database.
      * @return Optional containing the latest PowerReading, or empty if no data.
      */
     public Optional<PowerReading> getLatestReading() {
-        if (placeholderData == null || placeholderData.isEmpty()) {
+        // Query uses the loaded static final TABLE_NAME
+        String sql = "SELECT id, reading_date, power_consumed, fault_detected FROM " + TABLE_NAME +
+                     " ORDER BY reading_date DESC, id DESC LIMIT 1";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql);
+             ResultSet rs = pstmt.executeQuery()) {
+
+            if (rs.next()) {
+                // Extract data from ResultSet
+                int id = rs.getInt("id");
+                LocalDate date = rs.getDate("reading_date").toLocalDate();
+                double powerConsumed = rs.getDouble("power_consumed");
+                boolean faultDetected = rs.getBoolean("fault_detected");
+
+                // Create PowerReading object
+                PowerReading latestReading = new PowerReading(id, date, powerConsumed, faultDetected);
+                return Optional.of(latestReading);
+            } else {
+                // No records found
+                return Optional.empty();
+            }
+
+        } catch (SQLException e) {
+            // Log the error in a real application
+            e.printStackTrace();
+            // Return empty or throw a custom exception depending on desired error handling
             return Optional.empty();
         }
-        // Return the last element
-        return Optional.of(placeholderData.get(placeholderData.size() - 1));
     }
 
     /**
-     * Generates a report string for the specified month.
+     * Generates a report string for the specified month by querying the database.
      * @param month The YearMonth to generate the report for.
-     * @return String containing the formatted report, or a message indicating no data.
+     * @return String containing the formatted report, or a message indicating no data/error.
      */
     public String generateMonthlyReport(YearMonth month) {
-        if (placeholderData == null) {
-             return "Error: Data not initialized.";
+        // Calculate start and end dates for the given month
+        LocalDate startDate = month.atDay(1);
+        LocalDate endDate = month.atEndOfMonth();
+
+        // Query uses the loaded static final TABLE_NAME
+        String sql = "SELECT reading_date, power_consumed, fault_detected FROM " + TABLE_NAME +
+                     " WHERE reading_date BETWEEN ? AND ?";
+
+        List<PowerReading> monthData = new ArrayList<>();
+        double totalConsumption = 0;
+        long faultCount = 0;
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            // Set query parameters
+            pstmt.setDate(1, java.sql.Date.valueOf(startDate));
+            pstmt.setDate(2, java.sql.Date.valueOf(endDate));
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    // Extract data - ID not strictly needed for report, but could fetch if desired
+                    LocalDate date = rs.getDate("reading_date").toLocalDate();
+                    double powerConsumed = rs.getDouble("power_consumed");
+                    boolean faultDetected = rs.getBoolean("fault_detected");
+
+                    // Accumulate data for report
+                    // No need to create PowerReading objects if only aggregating
+                    totalConsumption += powerConsumed;
+                    if (faultDetected) {
+                        faultCount++;
+                    }
+                    monthData.add(new PowerReading(0, date, powerConsumed, faultDetected)); // Add dummy object just to count days
+                }
+            }
+
+        } catch (SQLException e) {
+            // Log the error
+            e.printStackTrace();
+            return "Error generating report: Database query failed.";
         }
 
-        List<PowerReading> monthData = placeholderData.stream()
-                .filter(reading -> YearMonth.from(reading.getDate()).equals(month))
-                .collect(Collectors.toList());
-
+        // --- Report Generation (same logic as before, using fetched data) ---
         if (monthData.isEmpty()) {
             return "No data available for " + month.format(DateTimeFormatter.ofPattern("MMMM yyyy")) + ".";
         }
 
-        double totalConsumption = monthData.stream().mapToDouble(PowerReading::getPowerConsumed).sum();
+        // Calculate average only if data exists
         double averageConsumption = totalConsumption / monthData.size();
-        long faultCount = monthData.stream().filter(PowerReading::isFaultDetected).count();
 
         return String.format("Power Consumption Report for %s:\n" +
                         "--------------------------------------------------\n" +
@@ -98,4 +204,53 @@ public class UtilityService {
                 averageConsumption,
                 faultCount);
     }
+
+    // --- Add methods for other CRUD operations as needed ---
+    // Example: Find readings with faults in the last N days
+    public List<PowerReading> findRecentFaults(int days) {
+        List<PowerReading> faultReadings = new ArrayList<>();
+        LocalDate sinceDate = LocalDate.now().minusDays(days);
+        // Query uses the loaded static final TABLE_NAME
+        String sql = "SELECT id, reading_date, power_consumed, fault_detected FROM " + TABLE_NAME +
+                     " WHERE fault_detected = true AND reading_date >= ? ORDER BY reading_date DESC";
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setDate(1, java.sql.Date.valueOf(sinceDate));
+
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    faultReadings.add(new PowerReading(
+                        rs.getInt("id"),
+                        rs.getDate("reading_date").toLocalDate(),
+                        rs.getDouble("power_consumed"),
+                        rs.getBoolean("fault_detected")
+                    ));
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace(); // Log error
+        }
+        return faultReadings;
+    }
+
+    // Example: Update operation (Mark a fault as acknowledged - requires adding 'fault_acknowledged' column to DB)
+    /*
+    public boolean acknowledgeFault(int readingId) {
+        // Assumes a 'fault_acknowledged BOOLEAN DEFAULT false' column exists
+        // Query uses the loaded static final TABLE_NAME
+        String sql = "UPDATE " + TABLE_NAME + " SET fault_acknowledged = true WHERE id = ? AND fault_detected = true";
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, readingId);
+            int rowsAffected = pstmt.executeUpdate();
+            return rowsAffected > 0; // Return true if update was successful
+        } catch (SQLException e) {
+            e.printStackTrace(); // Log error
+            return false;
+        }
+    }
+    */
+
 }

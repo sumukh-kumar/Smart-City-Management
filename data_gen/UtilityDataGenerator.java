@@ -8,14 +8,20 @@ import java.time.LocalDate;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
+// Import Dotenv
+import io.github.cdimascio.dotenv.Dotenv;
+// import io.github.cdimascio.dotenv.DotenvException; // Commented out as requested
+
+
 // Renamed class
 public class UtilityDataGenerator {
 
-    // --- Database Configuration ---
-    private static final String DB_URL = "jdbc:mysql://localhost:3306/smart_city_db"; // Replace smart_city_db with your DB name
-    private static final String DB_USER = "root"; // Replace with your MySQL username
-    private static final String DB_PASSWORD = "password"; // Replace with your MySQL password
-    private static final String TABLE_NAME = "power_readings"; // Replace with your table name
+    // Remove hardcoded DB constants
+    // private static final String DB_URL = ...
+    // private static final String DB_USER = ...
+    // private static final String DB_PASSWORD = ...
+    // private static final String TABLE_NAME = ...
+
 
     // --- Data Generation Parameters ---
     private static final double MIN_POWER = 10.0;
@@ -23,12 +29,39 @@ public class UtilityDataGenerator {
     private static final int FAULT_CHANCE_PERCENT = 5; // 5% chance of fault
 
     public static void main(String[] args) {
+        // Load environment variables from .env file
+        Dotenv dotenv = null;
+        try {
+            // Load .env file from the current directory (project root)
+            dotenv = Dotenv.configure().load();
+        // } catch (DotenvException e) { // Original catch block
+        } catch (Exception e) { // Catch general Exception instead
+            System.err.println("Error loading .env file. Make sure it exists in the project root.");
+            // Consider logging the specific exception type if needed for debugging
+            // System.err.println("Exception type: " + e.getClass().getName());
+            System.err.println("Details: " + e.getMessage());
+            System.exit(1); // Exit if config is missing
+        }
+
+        // Get DB config from Dotenv
+        final String dbUrl = dotenv.get("DB_URL");
+        final String dbUser = dotenv.get("DB_USER");
+        final String dbPassword = dotenv.get("DB_PASSWORD");
+        final String tableName = dotenv.get("DB_TABLE");
+
+        // Basic validation
+        if (dbUrl == null || dbUser == null || dbPassword == null || tableName == null) {
+            System.err.println("Error: One or more required environment variables (DB_URL, DB_USER, DB_PASSWORD, DB_TABLE) are missing in the .env file.");
+            System.exit(1);
+        }
+
+
         Random random = new Random();
         // Start simulation date remains the same logic
         LocalDate currentDate = LocalDate.now().minusMonths(3);
 
         System.out.println("Starting utility data generator...");
-        System.out.println("Connecting to database: " + DB_URL);
+        System.out.println("Connecting to database: " + dbUrl); // Use loaded variable
 
         // Load the MySQL JDBC driver
         try {
@@ -39,12 +72,12 @@ public class UtilityDataGenerator {
             return;
         }
 
-        // SQL Statements remain the same
-        String insertSql = "INSERT INTO " + TABLE_NAME + " (reading_date, power_consumed, fault_detected) VALUES (?, ?, ?)";
-        String deleteSql = "DELETE FROM " + TABLE_NAME + " WHERE reading_date < DATE_SUB(CURDATE(), INTERVAL 1 YEAR)";
+        // SQL Statements remain the same, using loaded tableName
+        String insertSql = "INSERT INTO " + tableName + " (reading_date, power_consumed, fault_detected) VALUES (?, ?, ?)";
+        String deleteSql = "DELETE FROM " + tableName + " WHERE reading_date < DATE_SUB(CURDATE(), INTERVAL 1 YEAR)";
 
 
-        try (Connection conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+        try (Connection conn = DriverManager.getConnection(dbUrl, dbUser, dbPassword)) { // Use loaded variables
             System.out.println("Database connection successful.");
             conn.setAutoCommit(false); // Use transactions
 
