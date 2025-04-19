@@ -13,3 +13,13 @@ CREATE TABLE IF NOT EXISTS power_readings (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Optional: track when record was inserted
     INDEX idx_reading_date (reading_date) -- Add index for faster date filtering/deletion
 );
+
+-- --- New Table for Monthly Statistics ---
+CREATE TABLE IF NOT EXISTS `power_stats` (
+    `year_month` CHAR(7) NOT NULL PRIMARY KEY,
+    `total_consumption` DOUBLE NOT NULL,
+    `fault_count` INT NOT NULL,
+    `days_recorded` INT NOT NULL,
+    `average_consumption` DOUBLE NOT NULL,
+    `last_updated` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);

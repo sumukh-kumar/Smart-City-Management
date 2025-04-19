@@ -152,6 +152,7 @@ public class UtilityService {
         List<PowerReading> monthData = new ArrayList<>(); // Keep list to count days easily
         double totalConsumption = 0;
         long faultCount = 0;
+        int daysRecorded = 0; // Use int for days count
 
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -172,7 +173,9 @@ public class UtilityService {
                     if (faultDetected) {
                         faultCount++;
                     }
-                    monthData.add(new PowerReading(0, date, powerConsumed, faultDetected)); // Add dummy object just to count days
+                    // We don't actually need the PowerReading objects here anymore, just the count
+                    // monthData.add(new PowerReading(0, date, powerConsumed, faultDetected));
+                    daysRecorded++; // Increment day count directly
                 }
             }
 
@@ -183,26 +186,77 @@ public class UtilityService {
         }
 
         // --- Report Generation (same logic as before, using fetched data) ---
-        if (monthData.isEmpty()) {
+        if (daysRecorded == 0) { // Check daysRecorded instead of monthData.isEmpty()
             return "No data available for " + month.format(DateTimeFormatter.ofPattern("MMMM yyyy")) + ".";
         }
 
-        // Calculate average only if data exists
-        double averageConsumption = totalConsumption / monthData.size();
+        double averageConsumption = totalConsumption / daysRecorded;
 
+        // --- Update Statistics Table ---
+        // Call the new method to insert or update the stats table
+        upsertMonthlyStats(month, totalConsumption, faultCount, daysRecorded, averageConsumption);
+        // --- End Update ---
+
+
+        // Format the report string (remains the same)
         return String.format("Power Consumption Report for %s:\n" +
                              "--------------------------------------------------\n" +
-                             " - Total Days Recorded: %d\n" +
-                             " - Total Power Consumed: %.2f kWh\n" +
-                             " - Average Daily Consumption: %.2f kWh\n" +
-                             " - Number of Faults Detected: %d\n" +
+                             "Total Days Recorded: %d\n" +
+                             "Total Consumption: %.2f kWh\n" +
+                             "Average Daily Consumption: %.2f kWh\n" +
+                             "Total Fault Days: %d\n" +
                              "--------------------------------------------------",
-                 month.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
-                 monthData.size(),
-                 totalConsumption,
-                 averageConsumption,
-                 faultCount);
+                             month.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
+                             daysRecorded, // Use daysRecorded
+                             totalConsumption,
+                             averageConsumption,
+                             faultCount);
     }
+
+    /**
+     * Inserts or updates a record in the power_stats table for the given month.
+     * This acts as our "Update" operation in CRUD.
+     *
+     * @param month The month being summarized.
+     * @param totalConsumption Total power consumed.
+     * @param faultCount Number of days with faults.
+     * @param daysRecorded Number of days data was recorded for.
+     * @param averageConsumption Calculated average consumption.
+     */
+    private void upsertMonthlyStats(YearMonth month, double totalConsumption, long faultCount, int daysRecorded, double averageConsumption) {
+        String yearMonthStr = month.format(DateTimeFormatter.ofPattern("yyyy-MM"));
+        // Use MySQL's INSERT ... ON DUPLICATE KEY UPDATE syntax for upsert
+        String upsertSql = "INSERT INTO power_stats (`year_month`, `total_consumption`, `fault_count`, `days_recorded`, `average_consumption`, `last_updated`) "
+                  + "VALUES (?, ?, ?, ?, ?, NOW()) "
+                  + "ON DUPLICATE KEY UPDATE "
+                  + "`total_consumption` = VALUES(`total_consumption`), "
+                  + "`fault_count` = VALUES(`fault_count`), "
+                  + "`days_recorded` = VALUES(`days_recorded`), "
+                  + "`average_consumption` = VALUES(`average_consumption`), "
+                  + "`last_updated` = NOW();";
+
+
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(upsertSql)) {
+
+            pstmt.setString(1, yearMonthStr);
+            pstmt.setDouble(2, totalConsumption);
+            pstmt.setLong(3, faultCount);
+            pstmt.setInt(4, daysRecorded);
+            pstmt.setDouble(5, averageConsumption);
+
+            int rowsAffected = pstmt.executeUpdate();
+            // Optional: Log if a row was inserted (1) or updated (2)
+            // System.out.println("Upserted stats for " + yearMonthStr + ". Rows affected: " + rowsAffected);
+
+        } catch (SQLException e) {
+            // Log the error, but don't stop report generation if stats update fails
+            System.err.println("Error updating power_stats table for month " + yearMonthStr + ": " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
 
     /**
      * Finds the latest month with data in the database and generates a report for it.
