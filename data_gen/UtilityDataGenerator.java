@@ -1,4 +1,3 @@
-// Removed package declaration as it's outside src/main/java
 
 import java.sql.Connection;
 import java.sql.DriverManager;

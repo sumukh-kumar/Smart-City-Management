@@ -11,9 +11,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
-import java.time.YearMonth;
+import java.time.YearMonth; // Ensure YearMonth is imported
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.TemporalAdjusters; // Import for finding first day of month
+// import java.time.temporal.TemporalAdjusters; // Import for finding first day of month - Not explicitly needed with YearMonth.atDay(1)
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -38,7 +38,8 @@ public class UtilityService {
     static {
         try {
             // Load .env file. Assumes the app runs with project root as working directory.
-            dotenv = Dotenv.configure().ignoreIfMissing().load(); // ignoreIfMissing might be safer for deployment
+            // ignoreIfMissing() might be safer for deployment, but throws RuntimeException if required keys are null later
+            dotenv = Dotenv.configure().ignoreIfMissing().load();
 
             DB_URL = dotenv.get("DB_URL");
             DB_USER = dotenv.get("DB_USER");
@@ -53,9 +54,8 @@ public class UtilityService {
             // Load the MySQL JDBC driver once during class loading
             Class.forName("com.mysql.cj.jdbc.Driver");
 
-        } catch (/*DotenvException*/ RuntimeException e) { // Temporarily catch RuntimeException
-             // Check if the cause is DotenvException if needed, or just log generally
-             System.err.println("Error during static initialization (potentially .env loading): " + e.getMessage());
+        } catch (RuntimeException e) { // Catch RuntimeException for validation errors from .env
+             System.err.println("Error during static initialization (potentially .env loading or validation): " + e.getMessage());
              e.printStackTrace(); // Print stack trace to see original exception
              throw new RuntimeException("Error during static initialization.", e); // Re-throw
         } catch (ClassNotFoundException e) {
@@ -149,7 +149,7 @@ public class UtilityService {
         String sql = "SELECT reading_date, power_consumed, fault_detected FROM " + TABLE_NAME +
                      " WHERE reading_date BETWEEN ? AND ?";
 
-        List<PowerReading> monthData = new ArrayList<>();
+        List<PowerReading> monthData = new ArrayList<>(); // Keep list to count days easily
         double totalConsumption = 0;
         long faultCount = 0;
 
@@ -168,7 +168,6 @@ public class UtilityService {
                     boolean faultDetected = rs.getBoolean("fault_detected");
 
                     // Accumulate data for report
-                    // No need to create PowerReading objects if only aggregating
                     totalConsumption += powerConsumed;
                     if (faultDetected) {
                         faultCount++;
@@ -192,18 +191,123 @@ public class UtilityService {
         double averageConsumption = totalConsumption / monthData.size();
 
         return String.format("Power Consumption Report for %s:\n" +
-                        "--------------------------------------------------\n" +
-                        " - Total Days Recorded: %d\n" +
-                        " - Total Power Consumed: %.2f kWh\n" +
-                        " - Average Daily Consumption: %.2f kWh\n" +
-                        " - Number of Faults Detected: %d\n" +
-                        "--------------------------------------------------",
-                month.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
-                monthData.size(),
-                totalConsumption,
-                averageConsumption,
-                faultCount);
+                             "--------------------------------------------------\n" +
+                             " - Total Days Recorded: %d\n" +
+                             " - Total Power Consumed: %.2f kWh\n" +
+                             " - Average Daily Consumption: %.2f kWh\n" +
+                             " - Number of Faults Detected: %d\n" +
+                             "--------------------------------------------------",
+                 month.format(DateTimeFormatter.ofPattern("MMMM yyyy")),
+                 monthData.size(),
+                 totalConsumption,
+                 averageConsumption,
+                 faultCount);
     }
+
+    /**
+     * Finds the latest month with data in the database and generates a report for it.
+     *
+     * @return A string containing the report for the latest month, or a message
+     * indicating no data was found.
+     */
+    public String generateLatestMonthlyReport() {
+        String findLatestDateSql = "SELECT MAX(reading_date) FROM " + TABLE_NAME;
+        LocalDate latestDate = null;
+
+        // Step 1: Find the latest date in the table
+        try (Connection conn = getConnection();
+             PreparedStatement pstmtLatest = conn.prepareStatement(findLatestDateSql);
+             ResultSet rs = pstmtLatest.executeQuery()) {
+
+            if (rs.next()) {
+                java.sql.Date sqlDate = rs.getDate(1);
+                if (sqlDate != null) {
+                    latestDate = sqlDate.toLocalDate();
+                } else {
+                    // Table is empty
+                    return "No data found in the table. Cannot generate report.";
+                }
+            } else {
+                   // Should not happen if MAX() is used, but handle defensively
+                   return "No data found in the table. Cannot generate report.";
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace(); // Log error
+            return "Error finding the latest date for report generation: " + e.getMessage();
+        }
+
+        // Step 2: Determine the YearMonth from the latest date
+        YearMonth latestMonth = YearMonth.from(latestDate);
+
+        // Step 3: Call the existing report generation method for that month
+        return generateMonthlyReport(latestMonth);
+    }
+
+
+    /**
+     * Deletes all utility readings recorded before the start of the month
+     * corresponding to the most recent reading date in the database.
+     *
+     * @return A string message indicating the result (success with count or error).
+     */
+    public String deleteReadingsBeforeLatestMonth() {
+        String findLatestDateSql = "SELECT MAX(reading_date) FROM " + TABLE_NAME;
+        LocalDate latestDate = null;
+
+        // Step 1: Find the latest date in the table
+        try (Connection conn = getConnection();
+             PreparedStatement pstmtLatest = conn.prepareStatement(findLatestDateSql);
+             ResultSet rs = pstmtLatest.executeQuery()) {
+
+            if (rs.next()) {
+                java.sql.Date sqlDate = rs.getDate(1);
+                if (sqlDate != null) {
+                    latestDate = sqlDate.toLocalDate();
+                } else {
+                    // Table is empty or no dates recorded
+                    return "No data found in the table. Nothing to delete.";
+                }
+            } else {
+                // Should not happen with MAX(), but handle defensively
+                return "No data found in the table. Nothing to delete.";
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace(); // Log error
+            return "Error finding the latest date for deletion: " + e.getMessage();
+        }
+
+        // Step 2: Determine the date threshold (start of the latest month)
+        LocalDate deleteBeforeDate = YearMonth.from(latestDate).atDay(1);
+
+        // If the latest date is already the first day of the month, there's nothing older *before* the start of that month
+        if (latestDate.equals(deleteBeforeDate)) {
+             return "Latest data is from the first day of the month. No older data to delete before this month.";
+        }
+
+        // Step 3: Execute the DELETE query
+        // Delete all records where reading_date is strictly BEFORE the start of the latest month
+        String deleteSql = "DELETE FROM " + TABLE_NAME + " WHERE reading_date < ?";
+        int rowsDeleted = 0;
+
+        try (Connection conn = getConnection();
+             PreparedStatement pstmtDelete = conn.prepareStatement(deleteSql)) {
+
+            pstmtDelete.setDate(1, java.sql.Date.valueOf(deleteBeforeDate));
+
+            rowsDeleted = pstmtDelete.executeUpdate();
+
+        } catch (SQLException e) {
+            e.printStackTrace(); // Log error
+            return "Error deleting old data: " + e.getMessage();
+        }
+
+        return String.format("Successfully deleted %d reading(s) before %s.",
+                             rowsDeleted,
+                             deleteBeforeDate.format(DateTimeFormatter.ISO_DATE));
+    }
+
 
     // --- Add methods for other CRUD operations as needed ---
     // Example: Find readings with faults in the last N days
@@ -222,10 +326,10 @@ public class UtilityService {
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
                     faultReadings.add(new PowerReading(
-                        rs.getInt("id"),
-                        rs.getDate("reading_date").toLocalDate(),
-                        rs.getDouble("power_consumed"),
-                        rs.getBoolean("fault_detected")
+                         rs.getInt("id"),
+                         rs.getDate("reading_date").toLocalDate(),
+                         rs.getDouble("power_consumed"),
+                         rs.getBoolean("fault_detected")
                     ));
                 }
             }
@@ -233,60 +337,6 @@ public class UtilityService {
             e.printStackTrace(); // Log error
         }
         return faultReadings;
-    }
-
-    // --- New Method for Deleting Old Data ---
-
-    /**
-     * Deletes all utility readings recorded before the start of the month
-     * corresponding to the most recent reading date in the database.
-     *
-     * @return A string message indicating the result (success with count or error).
-     */
-    public String deleteReadingsBeforeLatestMonth() {
-        String findLatestDateSql = "SELECT MAX(reading_date) FROM " + TABLE_NAME;
-        String deleteSql = "DELETE FROM " + TABLE_NAME + " WHERE reading_date < ?";
-        LocalDate latestDate = null;
-
-        // Step 1: Find the latest date in the table
-        try (Connection conn = getConnection();
-             PreparedStatement pstmtLatest = conn.prepareStatement(findLatestDateSql);
-             ResultSet rs = pstmtLatest.executeQuery()) {
-
-            if (rs.next()) {
-                java.sql.Date sqlDate = rs.getDate(1);
-                if (sqlDate != null) {
-                    latestDate = sqlDate.toLocalDate();
-                } else {
-                    return "No data found in the table. Nothing to delete.";
-                }
-            } else {
-                 return "No data found in the table. Nothing to delete.";
-            }
-
-        } catch (SQLException e) {
-            e.printStackTrace(); // Log error
-            return "Error finding the latest date: " + e.getMessage();
-        }
-
-        // Step 2: Calculate the first day of the month for the latest date
-        LocalDate firstDayOfLatestMonth = latestDate.with(TemporalAdjusters.firstDayOfMonth());
-
-        // Step 3: Delete records before that date
-        try (Connection conn = getConnection();
-             PreparedStatement pstmtDelete = conn.prepareStatement(deleteSql)) {
-
-            pstmtDelete.setDate(1, java.sql.Date.valueOf(firstDayOfLatestMonth));
-            int rowsAffected = pstmtDelete.executeUpdate();
-
-            return String.format("Successfully deleted %d record(s) from before %s.",
-                                 rowsAffected,
-                                 firstDayOfLatestMonth.format(DateTimeFormatter.ISO_DATE));
-
-        } catch (SQLException e) {
-            e.printStackTrace(); // Log error
-            return "Error deleting old records: " + e.getMessage();
-        }
     }
 
 
@@ -307,5 +357,35 @@ public class UtilityService {
         }
     }
     */
-
 }
+
+// Assuming PowerReading class exists in the same package (com.example.model)
+// public class PowerReading {
+//     private int id;
+//     private LocalDate readingDate;
+//     private double powerConsumed;
+//     private boolean faultDetected;
+
+//     public PowerReading(int id, LocalDate readingDate, double powerConsumed, boolean faultDetected) {
+//         this.id = id;
+//         this.readingDate = readingDate;
+//         this.powerConsumed = powerConsumed;
+//         this.faultDetected = faultDetected;
+//     }
+
+//     // Getters
+//     public int getId() { return id; }
+//     public LocalDate getReadingDate() { return readingDate; }
+//     public double getPowerConsumed() { return powerConsumed; }
+//     public boolean isFaultDetected() { return faultDetected; }
+
+//     @Override
+//     public String toString() {
+//         return "PowerReading{" +
+//                "id=" + id +
+//                ", readingDate=" + readingDate +
+//                ", powerConsumed=" + powerConsumed +
+//                ", faultDetected=" + faultDetected +
+//                '}';
+//     }
+// }

@@ -52,9 +52,14 @@ public class UtilityController {
     }
 
     private void handleReportButtonClick() {
-        // Generate report for the previous month for demonstration
-        YearMonth monthToReport = YearMonth.now().minusMonths(1);
-        String report = service.generateMonthlyReport(monthToReport);
+        // Remove the lines that calculate the previous month
+        // YearMonth monthToReport = YearMonth.now().minusMonths(1);
+        // String report = service.generateMonthlyReport(monthToReport);
+
+        // Call the new service method to generate the report for the latest month
+        String report = service.generateLatestMonthlyReport();
+
+        // Update the view with the result (this line remains the same)
         view.setReportContent(report);
     }
 
