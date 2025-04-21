@@ -1,406 +1,287 @@
 package com.example;
 
-import com.example.service.TrafficService;
-import com.example.service.TrafficService.Direction;
-import com.example.service.TrafficService.LightState;
-import com.vaadin.flow.component.AttachEvent;
+// Import Controller and Service
+import com.example.controller.TrafficController;
+// Import correct model classes
+import com.example.model.JunctionState;
+import com.example.model.ParkingSpot;
+import com.example.model.TrafficService;
+
+import com.vaadin.flow.component.ClickEvent;
+import com.vaadin.flow.component.ComponentEventListener;
 import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H2;
-import com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment;
-import com.vaadin.flow.component.orderedlayout.FlexComponent.JustifyContentMode;
+import com.vaadin.flow.component.html.Paragraph;
+import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.router.PageTitle;
-import com.vaadin.flow.router.Route;
-import com.vaadin.flow.theme.lumo.LumoUtility; // For utility classes
+import com.vaadin.flow.component.html.Div; // Import Div for layout
+import com.vaadin.flow.component.icon.Icon; // Import Icon
+import com.vaadin.flow.component.icon.VaadinIcon; // Import VaadinIcon
+import com.vaadin.flow.router.PageTitle; // Import PageTitle
+import com.vaadin.flow.router.Route; // Import Route
 
-import java.util.EnumMap;
+// Import necessary collections and stream utilities
+import java.time.format.DateTimeFormatter;
+import java.util.Comparator; // Import for sorting
+import java.util.List; // Import for List
 import java.util.Map;
+import java.util.stream.Collectors; // Import for Collectors
 
-@Route("traffic")
-@PageTitle("Traffic Simulation")
+@Route("traffic") // Add the Route annotation back
+@PageTitle("Traffic & Parking Management") // Update page title
 public class TrafficManagementView extends VerticalLayout {
 
-    private final TrafficService trafficService;
-    private Button simulateButton;
-    private Button backButton;
+    // UI Components
+    private final Button refreshButton;
+    private final Button parkingButton;
+    private final Button deleteButton;
+    private final Button backButton;
+    private final VerticalLayout junctionDisplayLayout;
+    // Replace TextArea with a VerticalLayout for parking spots
+    private final VerticalLayout parkingDisplayLayout; // Renamed from parkingDisplayArea
 
-    // Layout containers for different parts of the intersection
-    private VerticalLayout northApproach;
-    private VerticalLayout southApproach;
-    private HorizontalLayout westApproach;
-    private HorizontalLayout eastApproach;
-    private Div centerIntersection;
+    // Formatter for display
+    private static final DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    // Divs for the traffic lights (could be more complex later)
-    private Map<Direction, Div> lightDisplays = new EnumMap<>(Direction.class);
-
-    private static final int NUM_LANES = 4; // Must match service
-    private static final String CAR_BLOCK_STYLE = "car-block";
-    private static final String LANE_STYLE = "lane";
-
-    private HorizontalLayout middleRow; // Declare as field
-    private Div intersectionContainer; // Declare as field
 
     public TrafficManagementView() {
-        this.trafficService = TrafficService.getInstance();
-
-        addClassName("traffic-simulation-view");
+        addClassName("traffic-view");
         setSizeFull();
-        setAlignItems(Alignment.CENTER);
-        setJustifyContentMode(JustifyContentMode.CENTER);
+        setAlignItems(Alignment.CENTER); // Center items horizontally
 
-        // Inject CSS styles for lanes and cars
-        injectCustomCss();
+        // Keep background styling if desired
+        getStyle()
+                .set("background-image", "url(images/trafficmgmet_bg.png)") // Make sure this path is correct relative to webapp/frontend
+                .set("background-size", "cover")
+                .set("background-position", "center")
+                .set("background-repeat", "no-repeat")
+                .set("min-height", "100vh");
 
-        add(new H2("Density-Based Traffic Simulation"));
+        // Update title
+        H2 title = new H2("Smart City Traffic & Parking");
 
-        // Create the visual layout for the intersection
-        // This method will now fully assemble the intersectionContainer
-        createIntersectionLayout();
+        // --- Initialize UI Components ---
+        junctionDisplayLayout = new VerticalLayout();
+        junctionDisplayLayout.setSpacing(false);
+        junctionDisplayLayout.setPadding(false);
+        junctionDisplayLayout.setWidth("100%");
+        junctionDisplayLayout.add(new Paragraph("Click 'Refresh Data' to load junction status..."));
 
-        configureButtons();
-
-        // --- Main Layout Assembly ---
-        // REMOVE the assembly logic from here as it's now inside createIntersectionLayout
-        // HorizontalLayout middleRow = new HorizontalLayout(westApproach, centerIntersection, eastApproach);
-        // middleRow.setAlignItems(Alignment.CENTER);
-        // middleRow.setSpacing(false); // No space between approaches and center
-        //
-        // Div intersectionContainer = new Div(northApproach, middleRow, southApproach);
-        // // Style the container (optional)
-        // intersectionContainer.addClassName("intersection-container");
-        // intersectionContainer.getStyle()
-        //     .set("display", "inline-block") // Allow centering
-        //     .set("padding", "20px")
-        //     .set("background-color", "rgba(200, 200, 200, 0.8)")
-        //     .set("border-radius", "10px");
-
-
-        HorizontalLayout buttonLayout = new HorizontalLayout(simulateButton, backButton);
-        buttonLayout.setSpacing(true);
-        buttonLayout.addClassName(LumoUtility.Margin.Top.MEDIUM); // Add space above buttons
-
-        // Add the fully assembled intersectionContainer and buttons
-        // to the main VerticalLayout (this class)
-        add(intersectionContainer, buttonLayout); // Add the field intersectionContainer
-
-        updateVisuals(); // Initial display
-    }
-
-    private void injectCustomCss() {
-        String css = """
-            <style>
-                .lane {
-                    display: flex;
-                    border: 1px solid grey;
-                    background-color: lightgrey;
-                    min-height: 80px; /* N/S lane height */
-                    min-width: 25px;  /* N/S lane width */
-                    margin: 1px;
-                    box-sizing: border-box;
-                    flex-shrink: 0; /* Prevent individual lanes from shrinking */
-                }
-                .vertical-lanes .lane {
-                    flex-direction: column-reverse;
-                    justify-content: flex-start;
-                }
-                 .horizontal-lanes .lane {
-                    flex-direction: row-reverse;
-                     align-items: center;
-                     justify-content: flex-start;
-                     min-height: 25px; /* E/W lane height */
-                     min-width: 80px; /* E/W lane width */
-                }
-                .car-block {
-                    width: 12px;
-                    height: 8px;
-                    background-color: blue;
-                    border: 1px solid darkblue;
-                    margin: 1px;
-                    flex-shrink: 0;
-                }
-                .traffic-light {
-                    width: 25px;
-                    height: 25px;
-                    border: 1px solid black;
-                    border-radius: 50%;
-                    background-color: grey;
-                    flex-shrink: 0;
-                    margin: 5px;
-                }
-                .intersection-center {
-                     width: 130px;
-                     height: 130px;
-                     background-color: darkgrey;
-                     display: flex;
-                     align-items: center;
-                     justify-content: center;
-                     font-size: small;
-                     color: white;
-                     flex-shrink: 0;
-                }
-
-                /* Style the approach containers themselves */
-                 .vertical-lanes, .horizontal-lanes {
-                    padding: 0;
-                    margin: 0;
-                    flex-shrink: 0; /* Prevent the whole approach block from shrinking */
-                    /* display: inline-flex; /* Try inline-flex to see if it helps sizing */
-                 }
-
-                 /* Target the specific Layout components holding the lanes AGAIN */
-                 /* N/S Lanes Container (HorizontalLayout inside VerticalLayout .vertical-lanes) */
-                 .vertical-lanes > vaadin-horizontal-layout {
-                     display: inline-flex; /* Use inline-flex, might respect content size better */
-                     flex-wrap: nowrap !important; /* Force no wrapping */
-                     padding: 0;
-                     gap: 0;
-                     box-sizing: border-box; /* Ensure padding/border included */
-                 }
-                  /* E/W Lanes Container (VerticalLayout inside HorizontalLayout .horizontal-lanes) */
-                 .horizontal-lanes > vaadin-vertical-layout {
-                      display: inline-flex; /* Use inline-flex */
-                      flex-direction: column;
-                      flex-wrap: nowrap !important; /* Force no wrapping */
-                      padding: 0;
-                      gap: 0;
-                      box-sizing: border-box;
-                  }
-
-            </style>
-        """;
-        Div cssDiv = new Div();
-        cssDiv.getElement().setProperty("innerHTML", css);
-        getElement().appendChild(cssDiv.getElement());
-    }
+        // Initialize the new parking layout
+        parkingDisplayLayout = new VerticalLayout();
+        parkingDisplayLayout.setSpacing(true); // Add some space between spots
+        parkingDisplayLayout.setPadding(false);
+        parkingDisplayLayout.setWidth("100%");
+        parkingDisplayLayout.add(new Paragraph("Click 'Show Parking' to load status...")); // Initial text
+        // Optional: Add some max height and scrollbars if the list can be long
+        parkingDisplayLayout.getStyle()
+            .set("max-height", "400px") // Example max height
+            .set("overflow-y", "auto"); // Enable vertical scrolling
 
 
-    // REMOVE these constants
-    // private static final String NS_LANE_CONTAINER_WIDTH = (NUM_LANES * 25 + (NUM_LANES * 2) + 10) + "px";
-    // private static final String EW_LANE_CONTAINER_HEIGHT = (NUM_LANES * 25 + (NUM_LANES * 2) + 10) + "px";
-
-
-    private void createIntersectionLayout() {
-        // --- Create Lights First ---
-        createLightDiv(Direction.NORTH);
-        createLightDiv(Direction.SOUTH);
-        createLightDiv(Direction.WEST);
-        createLightDiv(Direction.EAST);
-
-        // --- North Approach (Vertical Lanes) ---
-        northApproach = new VerticalLayout();
-        northApproach.setSpacing(false);
-        northApproach.setPadding(false);
-        northApproach.setAlignItems(Alignment.CENTER);
-        northApproach.addClassName("vertical-lanes");
-        HorizontalLayout northLanes = new HorizontalLayout();
-        northLanes.setSpacing(false);
-        northLanes.setPadding(false);
-        northLanes.getStyle().set("flex-wrap", "nowrap"); // Keep this
-        // REMOVE setMinWidth
-        // northLanes.setMinWidth(NS_LANE_CONTAINER_WIDTH);
-        for (int i = 0; i < NUM_LANES; i++) {
-            northLanes.add(createLaneDiv(Direction.NORTH, i));
-        }
-        northApproach.add(northLanes);
-
-        // --- South Approach (Vertical Lanes) ---
-        southApproach = new VerticalLayout();
-        southApproach.setSpacing(false);
-        southApproach.setPadding(false);
-        southApproach.setAlignItems(Alignment.CENTER);
-        southApproach.addClassName("vertical-lanes");
-        HorizontalLayout southLanes = new HorizontalLayout();
-        southLanes.setSpacing(false);
-        southLanes.setPadding(false);
-        southLanes.getStyle().set("flex-wrap", "nowrap"); // Keep this
-        // REMOVE setMinWidth
-        // southLanes.setMinWidth(NS_LANE_CONTAINER_WIDTH);
-        for (int i = 0; i < NUM_LANES; i++) {
-            southLanes.add(createLaneDiv(Direction.SOUTH, i));
-        }
-        southApproach.add(southLanes);
-
-
-        // --- West Approach (Horizontal Lanes) ---
-        westApproach = new HorizontalLayout();
-        westApproach.setSpacing(false);
-        westApproach.setPadding(false);
-        westApproach.setJustifyContentMode(JustifyContentMode.CENTER);
-        westApproach.addClassName("horizontal-lanes");
-        VerticalLayout westLanes = new VerticalLayout();
-        westLanes.setSpacing(false);
-        westLanes.setPadding(false);
-        westLanes.getStyle().set("flex-wrap", "nowrap"); // Keep this
-        // REMOVE setMinHeight
-        // westLanes.setMinHeight(EW_LANE_CONTAINER_HEIGHT);
-        for (int i = 0; i < NUM_LANES; i++) {
-            westLanes.add(createLaneDiv(Direction.WEST, i));
-        }
-        westApproach.add(westLanes);
-
-
-        // --- East Approach (Horizontal Lanes) ---
-        eastApproach = new HorizontalLayout();
-        eastApproach.setSpacing(false);
-        eastApproach.setPadding(false);
-        eastApproach.setJustifyContentMode(JustifyContentMode.CENTER);
-        eastApproach.addClassName("horizontal-lanes");
-        VerticalLayout eastLanes = new VerticalLayout();
-        eastLanes.setSpacing(false);
-        eastLanes.setPadding(false);
-        eastLanes.getStyle().set("flex-wrap", "nowrap"); // Keep this
-        // REMOVE setMinHeight
-        // eastLanes.setMinHeight(EW_LANE_CONTAINER_HEIGHT);
-        for (int i = 0; i < NUM_LANES; i++) {
-            eastLanes.add(createLaneDiv(Direction.EAST, i));
-        }
-        eastApproach.add(eastLanes);
-
-
-        // --- Center Intersection Placeholder ---
-        centerIntersection = new Div();
-        centerIntersection.addClassName("intersection-center");
-        centerIntersection.setText("Intersection");
-
-        // --- Assemble Middle Row with Lights (inside this method) ---
-        // Use the field middleRow
-        middleRow = new HorizontalLayout(westApproach, lightDisplays.get(Direction.WEST), centerIntersection, lightDisplays.get(Direction.EAST), eastApproach);
-        middleRow.setAlignItems(Alignment.CENTER);
-        middleRow.setSpacing(true); // Add some space around lights/center
-        middleRow.setJustifyContentMode(JustifyContentMode.CENTER);
-
-        // --- Assemble Intersection Container with Lights (inside this method) ---
-        // Use the field intersectionContainer
-        intersectionContainer = new Div(lightDisplays.get(Direction.NORTH), middleRow, lightDisplays.get(Direction.SOUTH));
-        intersectionContainer.addClassName("intersection-container");
-        // Apply styles to center the whole block and add padding/background
-        intersectionContainer.getStyle()
-            .set("display", "flex") // Use flexbox for alignment
-            .set("flex-direction", "column") // Stack N light, middle, S light vertically
-            .set("align-items", "center") // Center items horizontally
-            .set("gap", "5px") // Space between N light, middle, S light
-            .set("padding", "20px")
-            .set("background-color", "rgba(200, 200, 200, 0.8)")
-            .set("border-radius", "10px");
-
-        // No need to set alignment here, done in constructor for the main layout
-        // setAlignItems(Alignment.CENTER);
-    }
-
-    // Helper to create a lane Div (ensure this exists)
-    private Div createLaneDiv(Direction dir, int laneIndex) {
-        Div lane = new Div();
-        lane.addClassName(LANE_STYLE);
-        lane.getElement().setAttribute("data-direction", dir.name());
-        lane.getElement().setAttribute("data-lane", String.valueOf(laneIndex));
-        return lane;
-    }
-
-     // Helper to create a traffic light Div (ensure this exists)
-    private Div createLightDiv(Direction dir) {
-        Div light = new Div();
-        light.addClassName("traffic-light");
-        lightDisplays.put(dir, light);
-        return light;
-    }
-
-    private void configureButtons() {
-        simulateButton = new Button("Simulate Step"); // Renamed button
-        simulateButton.addClickListener(e -> {
-            trafficService.simulateStep(); // Advance the simulation state
-            updateVisuals(); // Update visuals based on new state
-        });
-
+        refreshButton = new Button("Refresh Data");
+        parkingButton = new Button("Show Parking");
+        deleteButton = new Button("Delete Old Junction Data");
+        deleteButton.addThemeVariants(com.vaadin.flow.component.button.ButtonVariant.LUMO_ERROR);
         backButton = new Button("Back to Main Menu");
         backButton.addClickListener(e -> backButton.getUI().ifPresent(ui -> ui.navigate("")));
+
+        // --- Layout ---
+        HorizontalLayout buttonBar = new HorizontalLayout(refreshButton, parkingButton, deleteButton, backButton);
+        buttonBar.setSpacing(true);
+
+        // Content Box (semi-transparent white background)
+        VerticalLayout contentBox = new VerticalLayout(
+                new H2("Live Junction Status"),
+                junctionDisplayLayout,
+                new H2("Parking Status"),
+                parkingDisplayLayout, // Use the new parking layout
+                buttonBar
+        );
+        contentBox.setAlignItems(Alignment.CENTER);
+        contentBox.getStyle()
+           .set("background-color", "rgba(255, 255, 255, 0.85)") // Slightly more opaque
+           .set("padding", "20px")
+           .set("border-radius", "10px");
+        contentBox.setWidth("80%"); // Adjust width
+        contentBox.setHeight("auto"); // Adjust height based on content
+
+        // Add title and content box to the main layout
+        add(title, contentBox);
+        setJustifyContentMode(JustifyContentMode.CENTER); // Center the content box vertically
+
+        // Instantiate the Controller, passing Model (via Service instance) and View
+        // No change needed here as controller constructor remains the same
+        new TrafficController(TrafficService.getInstance(), this);
     }
 
-    // Update both lights and car blocks
-    private void updateVisuals() {
-        updateLightDisplays();
-        updateCarDisplays();
-    }
+    // --- Methods for Controller Interaction ---
 
-    private void updateLightDisplays() {
-        LightState currentState = trafficService.getCurrentLightState();
-        // Determine color based on the overall state
-        String nsColor = "grey"; // Default color when off or state unknown
-        String ewColor = "grey"; // Default color when off or state unknown
-
-        // Set colors based on the current simulation state
-        switch (currentState) {
-            case GREEN_NS:  nsColor = "lime"; ewColor = "red"; break; // North/South Green, East/West Red
-            case YELLOW_NS: nsColor = "yellow"; ewColor = "red"; break; // North/South Yellow, East/West Red
-            case GREEN_EW:  nsColor = "red"; ewColor = "lime"; break; // North/South Red, East/West Green
-            case YELLOW_EW: nsColor = "red"; ewColor = "yellow"; break; // North/South Red, East/West Yellow
+    /**
+     * Updates the junction display area with the latest states.
+     * @param latestJunctions A map of junctionId to JunctionState.
+     */
+    public void updateJunctionDisplay(Map<String, JunctionState> latestJunctions) {
+        junctionDisplayLayout.removeAll();
+        if (latestJunctions == null || latestJunctions.isEmpty()) {
+            junctionDisplayLayout.add(new Paragraph("No junction data available."));
+            return;
         }
 
-        // Apply the determined colors to the light Divs
-        lightDisplays.get(Direction.NORTH).getStyle().set("background-color", nsColor);
-        lightDisplays.get(Direction.SOUTH).getStyle().set("background-color", nsColor);
-        lightDisplays.get(Direction.EAST).getStyle().set("background-color", ewColor);
-        lightDisplays.get(Direction.WEST).getStyle().set("background-color", ewColor);
+        latestJunctions.values().stream()
+            .sorted(Comparator.comparing(JunctionState::getJunctionId))
+            .forEach(state -> {
+                VerticalLayout junctionLayout = new VerticalLayout();
+                junctionLayout.setSpacing(false);
+                junctionLayout.setPadding(false);
+                junctionLayout.getStyle().set("border", "1px solid #eee").set("padding", "10px").set("margin-bottom", "10px");
+
+                // Display Junction ID and Timestamp using the correct getter
+                junctionLayout.add(new Span("Junction: " + state.getJunctionId() +
+                                            " (Updated: " + (state.getLastUpdated() != null ? state.getLastUpdated().format(dtf) : "N/A") + ")")); // Use getLastUpdated()
+
+                // Display Lanes in a Horizontal Layout
+                HorizontalLayout lanesLayout = new HorizontalLayout();
+                lanesLayout.setSpacing(true);
+                lanesLayout.setWidthFull(); // Make lanes layout take full width
+
+                // Create spans for each lane, highlighting the green one
+                Span lane1 = createLaneSpan(1, state.getLane1Vehicles(), state.getGreenLaneId());
+                Span lane2 = createLaneSpan(2, state.getLane2Vehicles(), state.getGreenLaneId());
+                Span lane3 = createLaneSpan(3, state.getLane3Vehicles(), state.getGreenLaneId());
+                Span lane4 = createLaneSpan(4, state.getLane4Vehicles(), state.getGreenLaneId());
+
+                lanesLayout.add(lane1, lane2, lane3, lane4);
+                lanesLayout.setJustifyContentMode(JustifyContentMode.BETWEEN); // Space out lanes
+
+                junctionLayout.add(lanesLayout);
+                junctionDisplayLayout.add(junctionLayout);
+            });
     }
 
-    private void updateCarDisplays() {
-        Map<Direction, int[]> currentCars = trafficService.getCarsPerLane();
-        // Update all approaches using the refactored helper
-        updateCarsForApproach(northApproach, currentCars);
-        updateCarsForApproach(southApproach, currentCars);
-        updateCarsForApproach(westApproach, currentCars);
-        updateCarsForApproach(eastApproach, currentCars);
+    // Helper method to create styled spans for lanes
+    private Span createLaneSpan(int laneId, int vehicleCount, int greenLaneId) {
+        Span laneSpan = new Span(String.format("Lane %d: %d vehicles", laneId, vehicleCount));
+        laneSpan.getStyle()
+                .set("border", "1px solid #ccc")
+                .set("padding", "8px")
+                .set("border-radius", "4px")
+                .set("text-align", "center")
+                .set("flex-grow", "1"); // Allow spans to grow
+
+        if (laneId == greenLaneId) {
+            laneSpan.getStyle()
+                    .set("background-color", "#90EE90") // Light green background
+                    .set("font-weight", "bold")
+                    .set("border-color", "#2E8B57"); // Darker green border
+        } else {
+            laneSpan.getStyle().set("background-color", "#f0f0f0"); // Light grey background
+        }
+        return laneSpan;
     }
 
-    // Refactored helper to update cars for any approach layout
-    // Uses Component as the parameter type to accept both VerticalLayout and HorizontalLayout
-    private void updateCarsForApproach(com.vaadin.flow.component.Component approachLayout, Map<Direction, int[]> currentCars) {
-         // Find the layout containing the lanes (the first child that is HLayout or VLayout)
-         approachLayout.getChildren()
-             .filter(comp -> comp instanceof HorizontalLayout || comp instanceof VerticalLayout) // Find lane container
-             .findFirst()
-             .ifPresent(laneContainer -> {
-                 // Iterate through the children of the lane container
-                 laneContainer.getChildren()
-                     .filter(comp -> comp instanceof Div && comp.getElement().hasAttribute("data-direction")) // Find lane Divs
-                     .forEach(laneComp -> {
-                         Div laneDiv = (Div) laneComp;
-                         // Safely parse attributes
-                         try {
-                             Direction dir = Direction.valueOf(laneDiv.getElement().getAttribute("data-direction"));
-                             int laneIndex = Integer.parseInt(laneDiv.getElement().getAttribute("data-lane"));
 
-                             // Check if the direction and laneIndex are valid for the currentCars map
-                             if (currentCars.containsKey(dir) && laneIndex >= 0 && laneIndex < currentCars.get(dir).length) {
-                                 int carCount = currentCars.get(dir)[laneIndex];
+    /**
+     * Displays parking information dynamically using individual components.
+     * @param spots The list of ParkingSpot objects.
+     */
+    // Updated method signature and logic
+    public void displayParkingInfo(List<ParkingSpot> spots) {
+        parkingDisplayLayout.removeAll(); // Clear previous content
 
-                                 // Remove old car blocks
-                                 laneDiv.removeAll();
-                                 // Add new car blocks
-                                 for (int i = 0; i < carCount; i++) {
-                                     Div carBlock = new Div();
-                                     carBlock.addClassName(CAR_BLOCK_STYLE);
-                                     laneDiv.add(carBlock);
-                                 }
-                             } else {
-                                 System.err.println("Warning: Invalid direction or lane index found in DOM: " + dir + ", " + laneIndex);
-                                 laneDiv.removeAll(); // Clear potentially invalid lane
-                             }
-                         } catch (IllegalArgumentException | NullPointerException e) {
-                             System.err.println("Error parsing lane attributes or finding data: " + e.getMessage());
-                             laneDiv.removeAll(); // Clear potentially invalid lane
-                         }
-                     });
+        if (spots == null || spots.isEmpty()) {
+            parkingDisplayLayout.add(new Paragraph("No parking spot data available."));
+            return;
+        }
+
+        long availableCount = spots.stream().filter(s -> !s.isOccupied()).count();
+        long totalCount = spots.size();
+
+        // Add a summary header
+        H2 parkingHeader = new H2(String.format("Parking Availability (%d / %d Available)", availableCount, totalCount));
+        parkingDisplayLayout.add(parkingHeader);
+
+
+        // Display each parking spot
+        spots.stream()
+             // Optional: Sort by spot ID
+             .sorted(Comparator.comparing(ParkingSpot::getSpotId))
+             .forEach(spot -> {
+                 // Use HorizontalLayout for each spot's details
+                 HorizontalLayout spotLayout = new HorizontalLayout();
+                 spotLayout.setWidthFull();
+                 spotLayout.setAlignItems(Alignment.CENTER); // Align items vertically
+                 spotLayout.getStyle()
+                         .set("border-bottom", "1px solid #eee") // Separator line
+                         .set("padding", "10px 0"); // Add some padding
+
+                 // Icon and Status Text
+                 Icon statusIcon;
+                 Span statusText = new Span();
+                 statusText.getStyle().set("font-weight", "bold");
+
+                 if (spot.isOccupied()) {
+                     statusIcon = VaadinIcon.CLOSE_CIRCLE.create();
+                     statusIcon.setColor("red");
+                     statusText.setText("Occupied");
+                     statusText.getStyle().set("color", "red");
+                 } else {
+                     statusIcon = VaadinIcon.CHECK_CIRCLE.create();
+                     statusIcon.setColor("green");
+                     statusText.setText("Available");
+                     statusText.getStyle().set("color", "green");
+                 }
+
+                 // Spot ID and Description
+                 String description = spot.getLocationDescription() != null && !spot.getLocationDescription().isEmpty()
+                                      ? " (" + spot.getLocationDescription() + ")" : "";
+                 Span spotIdSpan = new Span(spot.getSpotId() + description);
+                 spotIdSpan.getStyle().set("flex-grow", "1"); // Allow ID to take up space
+
+                 // Last Updated Time
+                 String updatedTime = spot.getLastUpdated() != null
+                                      ? spot.getLastUpdated().format(dtf) : "N/A";
+                 Span timeSpan = new Span("Updated: " + updatedTime);
+                 timeSpan.getStyle().set("font-size", "small").set("color", "gray");
+
+                 // Add components to the spot layout
+                 spotLayout.add(statusIcon, statusText, spotIdSpan, timeSpan);
+                 parkingDisplayLayout.add(spotLayout); // Add the spot layout to the main parking layout
              });
     }
 
-    // REMOVE the duplicate updateCarsForApproach(HorizontalLayout ...) method entirely.
 
-    @Override
-    protected void onAttach(AttachEvent attachEvent) {
-        super.onAttach(attachEvent);
-        updateVisuals(); // Refresh visuals when the view is displayed/attached
+    /**
+     * Shows a notification message to the user.
+     * @param message The message to display.
+     * @param isError True if the message represents an error.
+     */
+    public void showNotification(String message, boolean isError) {
+        Notification notification = new Notification(message, 3000, Notification.Position.MIDDLE);
+        if (isError) {
+            notification.addThemeVariants(NotificationVariant.LUMO_ERROR);
+        } else {
+            notification.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+        }
+        notification.open();
     }
+
+    // --- Listener Adders ---
+
+    public void addRefreshButtonListener(ComponentEventListener<ClickEvent<Button>> listener) {
+        refreshButton.addClickListener(listener);
+    }
+
+    public void addParkingButtonListener(ComponentEventListener<ClickEvent<Button>> listener) {
+        parkingButton.addClickListener(listener);
+    }
+
+    public void addDeleteButtonListener(ComponentEventListener<ClickEvent<Button>> listener) {
+        deleteButton.addClickListener(listener);
+    }
+
+    // Removed onAttach and other unused methods/fields
 }

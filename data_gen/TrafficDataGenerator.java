@@ -8,6 +8,8 @@ import java.sql.SQLException;
 // Removed Arrays and List imports as SIGNAL_LOCATIONS is removed
 // import java.util.Arrays;
 // import java.util.List;
+import java.sql.Statement;
+import java.sql.ResultSet;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
@@ -70,7 +72,6 @@ public class TrafficDataGenerator {
         Random random = new Random();
 
         System.out.println("Starting traffic data generator...");
-        // Updated log message
         System.out.println("Target Junction State Table: " + JUNCTION_TABLE_NAME);
         System.out.println("Target Parking Table: " + PARKING_TABLE_NAME);
         System.out.println("Connecting to database: " + dbUrl);
