@@ -1,24 +1,40 @@
 package com.example.service;
 
-import com.example.model.TrafficSignal;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
+import java.util.stream.IntStream;
 
 public class TrafficService {
 
-    private List<TrafficSignal> trafficSignals;
+    // --- Singleton Pattern ---
     private static TrafficService instance;
     private final Random random = new Random();
+    private static final int NUM_LANES = 4; // Define number of lanes per direction
 
-    // Private constructor for singleton pattern
+    // --- State ---
+    public enum LightState { RED, YELLOW_NS, YELLOW_EW, GREEN_NS, GREEN_EW } // More specific green/yellow states
+    public enum Direction { NORTH, SOUTH, EAST, WEST }
+
+    private Map<Direction, int[]> carsPerLane; // Stores car count for each lane
+    private LightState currentLightState;
+    private int greenTimer = 0; // How long the current green light has been active
+    private final int MIN_GREEN_TIME = 5; // Minimum steps a light stays green
+    private final int YELLOW_TIME = 2;  // Steps for yellow light
+
     private TrafficService() {
-        generatePlaceholderData();
+        carsPerLane = new EnumMap<>(Direction.class);
+        for (Direction dir : Direction.values()) {
+            carsPerLane.put(dir, new int[NUM_LANES]);
+            // Initialize with some random cars
+            for(int i = 0; i < NUM_LANES; i++) {
+                carsPerLane.get(dir)[i] = random.nextInt(5); // 0-4 cars initially per lane
+            }
+        }
+        // Initial state: N/S Green
+        currentLightState = LightState.GREEN_NS;
+        greenTimer = MIN_GREEN_TIME + random.nextInt(5); // Initial green duration
+        System.out.println("Initial State: " + currentLightState + ", Cars: " + carsPerLane);
     }
 
-    // Get singleton instance
     public static synchronized TrafficService getInstance() {
         if (instance == null) {
             instance = new TrafficService();
@@ -26,58 +42,93 @@ public class TrafficService {
         return instance;
     }
 
-    // Generate initial simulated data
-    private void generatePlaceholderData() {
-        trafficSignals = new ArrayList<>();
-        trafficSignals.add(new TrafficSignal("Main St & 1st Ave", 15));
-        trafficSignals.add(new TrafficSignal("Oak St & Highway 101", 25));
-        trafficSignals.add(new TrafficSignal("Maple Dr & Park Rd", 8));
-        // Add more signals as needed
-    }
+    // --- Simulation Logic ---
 
     /**
-     * Gets an unmodifiable list of all traffic signals.
-     * @return List of TrafficSignal objects.
+     * Simulates one step: cars arrive/leave, lights potentially change based on density.
      */
-    public List<TrafficSignal> getAllSignals() {
-        return Collections.unmodifiableList(trafficSignals);
+    public void simulateStep() {
+        // 1. Simulate car arrival/departure (simple random changes)
+        simulateCarChanges();
+
+        // 2. Update light state based on timer and density
+        updateLightState();
+
+        System.out.println("State after step: " + currentLightState + ", Timer: " + greenTimer + ", Cars: " + carsPerLane);
     }
 
-    /**
-     * Simulates a change in vehicle count for a random signal,
-     * adjusts its duration, and returns a message describing the change.
-     * @return A String describing the simulated change, or null if no signals exist.
-     */
-    public String simulateTrafficChange() { // Changed return type to String
-        if (trafficSignals == null || trafficSignals.isEmpty()) {
-            System.out.println("No traffic signals to simulate.");
-            return null; // Return null if no simulation happened
+    private void simulateCarChanges() {
+        for (Direction dir : Direction.values()) {
+            for (int i = 0; i < NUM_LANES; i++) {
+                // Chance to add a car
+                if (random.nextInt(10) < 3) { // 30% chance
+                    carsPerLane.get(dir)[i] = Math.min(10, carsPerLane.get(dir)[i] + 1); // Max 10 cars per lane
+                }
+                // Chance for a car to leave (only if light is green for that direction)
+                boolean isGreen = (currentLightState == LightState.GREEN_NS && (dir == Direction.NORTH || dir == Direction.SOUTH)) ||
+                                  (currentLightState == LightState.GREEN_EW && (dir == Direction.EAST || dir == Direction.WEST));
+                if (isGreen && carsPerLane.get(dir)[i] > 0 && random.nextInt(10) < 5) { // 50% chance if green
+                     carsPerLane.get(dir)[i]--;
+                }
+            }
         }
-
-        // Pick a random signal
-        TrafficSignal signal = trafficSignals.get(random.nextInt(trafficSignals.size()));
-        // System.out.println(">>> Simulating change for signal: " + signal); // DEBUG: Before change (optional)
-        int oldVehicleCount = signal.getVehicleCount(); // Store old value for message
-
-        // Simulate a change in vehicle count (e.g., +/- 10 vehicles, min 0)
-        int change = random.nextInt(21) - 10; // Random change between -10 and +10
-        int newVehicleCount = Math.max(0, signal.getVehicleCount() + change); // Ensure count doesn't go below 0
-
-        // Update the vehicle count (this will also trigger duration recalculation via the setter)
-        signal.setVehicleCount(newVehicleCount);
-
-        // System.out.println("<<< Signal after change: " + signal); // DEBUG: After change (optional)
-
-        // Construct the message to be returned
-        String message = String.format(
-            "Simulated change for signal %d (%s): Vehicle count changed from %d to %d. New duration: %d s.",
-            signal.getId(),
-            signal.getLocation(),
-            oldVehicleCount,
-            newVehicleCount,
-            signal.getSignalDuration()
-        );
-        System.out.println(message); // Keep printing to console as well (optional)
-        return message; // Return the message
     }
+
+    private void updateLightState() {
+        greenTimer--;
+
+        switch (currentLightState) {
+            case GREEN_NS:
+                if (greenTimer <= 0) { // Time to consider switching
+                   currentLightState = LightState.YELLOW_NS; // Switch to Yellow N/S
+                   greenTimer = YELLOW_TIME;
+                }
+                break;
+            case YELLOW_NS:
+                 if (greenTimer <= 0) { // Yellow time finished
+                    currentLightState = LightState.GREEN_EW; // Switch to E/W Green
+                    // Set green time based on density (simple example)
+                    int ewWaiting = getTotalCars(Direction.EAST) + getTotalCars(Direction.WEST);
+                    greenTimer = MIN_GREEN_TIME + (ewWaiting / 2); // Longer green for more cars
+                 }
+                break;
+            case GREEN_EW:
+                 if (greenTimer <= 0) { // Time to consider switching
+                    currentLightState = LightState.YELLOW_EW; // Switch to Yellow E/W
+                    greenTimer = YELLOW_TIME;
+                 }
+                break;
+            case YELLOW_EW:
+                 if (greenTimer <= 0) { // Yellow time finished
+                    currentLightState = LightState.GREEN_NS; // Switch to N/S Green
+                    // Set green time based on density
+                    int nsWaiting = getTotalCars(Direction.NORTH) + getTotalCars(Direction.SOUTH);
+                    greenTimer = MIN_GREEN_TIME + (nsWaiting / 2);
+                 }
+                break;
+        }
+    }
+
+    // --- Data Access ---
+
+    public Map<Direction, int[]> getCarsPerLane() {
+        // Return a deep copy to prevent external modification
+        Map<Direction, int[]> copy = new EnumMap<>(Direction.class);
+        for(Map.Entry<Direction, int[]> entry : carsPerLane.entrySet()) {
+            copy.put(entry.getKey(), Arrays.copyOf(entry.getValue(), entry.getValue().length));
+        }
+        return copy;
+    }
+
+    public LightState getCurrentLightState() {
+        return currentLightState;
+    }
+
+    private int getTotalCars(Direction dir) {
+        return IntStream.of(carsPerLane.get(dir)).sum();
+    }
+
+    // --- Old methods removed ---
+    // public Map<Direction, LightState> simulateLightChange() { ... }
+    // public Map<Direction, LightState> getCurrentLightStates() { ... }
 }
