@@ -1,38 +1,42 @@
 package com.example;
 
-import com.example.model.TrafficSignal;
-import com.example.service.TrafficService; // Import the service
+// Removed imports for TrafficSignal and TrafficService
+// import com.example.model.TrafficSignal;
+// import com.example.service.TrafficService;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.grid.Grid;
+// Removed import for Grid
+// import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.html.H2;
-import com.vaadin.flow.component.html.Paragraph; // Import Paragraph
+import com.vaadin.flow.component.html.Paragraph; // Keep Paragraph
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 
-import java.util.List;
+// Removed import for List
+// import java.util.List;
 
 @Route("traffic") // Route for this view
 @PageTitle("Traffic Management")
 public class TrafficManagementView extends VerticalLayout {
 
-    private final TrafficService trafficService; // Use the singleton service
-    private Grid<TrafficSignal> grid = new Grid<>(TrafficSignal.class);
-    private Button simulateButton;
+    // Removed fields related to TrafficService and Grid
+    // private final TrafficService trafficService;
+    // private Grid<TrafficSignal> grid = new Grid<>(TrafficSignal.class);
+    // private Button simulateButton; // Removed simulate button
     private Button backButton;
-    private Paragraph statusMessage; // Add a field for the status message
+    private Paragraph statusMessage; // Keep status message for placeholder
 
     public TrafficManagementView() {
-        // Get the singleton instance of the service
-        this.trafficService = TrafficService.getInstance();
+        // Removed instantiation of TrafficService
+        // this.trafficService = TrafficService.getInstance();
 
         addClassName("traffic-view");
         setSizeFull();
         setAlignItems(Alignment.CENTER);
 
-        // Optional: Add background styling
+        // Optional: Add background styling (kept as is)
         getStyle()
                 .set("background-image", "url(images/trafficmgmet_bg.png)")
                 .set("background-size", "cover")
@@ -42,19 +46,20 @@ public class TrafficManagementView extends VerticalLayout {
 
         add(new H2("Traffic Management System"));
 
-        // Initialize the status message paragraph
-        statusMessage = new Paragraph("Click 'Simulate Traffic Change' to see updates.");
+        // Initialize the status message paragraph with a placeholder
+        statusMessage = new Paragraph("Traffic Management feature is currently under development."); // Updated placeholder text
         statusMessage.getStyle().set("font-style", "italic"); // Optional styling
 
-        configureGrid();
-        configureButtons();
+        // Removed call to configureGrid()
+        // configureGrid();
+        configureButtons(); // Keep configuring the back button
 
-        // Layout components
-        HorizontalLayout buttonLayout = new HorizontalLayout(simulateButton, backButton);
+        // Layout components - removed simulateButton
+        HorizontalLayout buttonLayout = new HorizontalLayout(backButton);
         buttonLayout.setSpacing(true);
 
-        // Add the status message to the content layout
-        VerticalLayout content = new VerticalLayout(grid, statusMessage, buttonLayout);
+        // Add the status message to the content layout - removed grid
+        VerticalLayout content = new VerticalLayout(statusMessage, buttonLayout);
         content.setAlignItems(Alignment.CENTER);
         content.getStyle()
            .set("background-color", "rgba(255, 255, 255, 0.8)")
@@ -65,45 +70,30 @@ public class TrafficManagementView extends VerticalLayout {
         add(content);
         setJustifyContentMode(JustifyContentMode.CENTER);
 
-        updateGrid(); // Initial data load
+        // Removed initial call to updateGrid()
+        // updateGrid();
     }
 
-    private void configureGrid() {
-        grid.addClassName("traffic-grid");
-        grid.setSizeFull();
-        // Configure columns explicitly
-        grid.setColumns("id", "location", "vehicleCount", "signalDuration");
-        grid.getColumnByKey("signalDuration").setHeader("Duration (s)"); // Rename header
-
-        grid.getColumns().forEach(col -> col.setAutoWidth(true).setSortable(true));
-    }
+    // Removed configureGrid method
+    // private void configureGrid() { ... }
 
     private void configureButtons() {
-        simulateButton = new Button("Simulate Traffic Change");
-        simulateButton.addClickListener(e -> {
-            String message = trafficService.simulateTrafficChange(); // Call the service method and get the message
-            if (message != null) {
-                statusMessage.setText(message); // Update the paragraph text
-            } else {
-                statusMessage.setText("No signals available to simulate.");
-            }
-            updateGrid(); // Refresh the grid to show changes
-        });
+        // Removed simulateButton logic
+        // simulateButton = new Button("Simulate Traffic Change");
+        // simulateButton.addClickListener(e -> { ... });
 
         backButton = new Button("Back to Main Menu");
         // Assuming the main menu is at the root ""
         backButton.addClickListener(e -> backButton.getUI().ifPresent(ui -> ui.navigate("")));
     }
 
-    private void updateGrid() {
-        List<TrafficSignal> signals = trafficService.getAllSignals();
-        grid.setItems(signals); // Update the grid data
-    }
+    // Removed updateGrid method
+    // private void updateGrid() { ... }
 
     @Override
     protected void onAttach(AttachEvent attachEvent) {
         super.onAttach(attachEvent);
-        // Refresh grid when the view is displayed/attached
-        updateGrid();
+        // Removed call to updateGrid()
+        // updateGrid();
     }
 }
