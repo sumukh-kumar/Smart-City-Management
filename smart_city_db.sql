@@ -1,3 +1,4 @@
+
 -- Create the database (if it doesn't exist)
 CREATE DATABASE IF NOT EXISTS smart_city_db;
 
@@ -88,4 +89,30 @@ CREATE TABLE noise_level_readings (
     exceeds_limit BOOLEAN NOT NULL,
     INDEX idx_location (location),
     INDEX idx_timestamp (timestamp)
+);
+-- ... existing code ...
+
+-- Create Emergency Management Table
+CREATE TABLE IF NOT EXISTS emergencies (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    type VARCHAR(100) NOT NULL,
+    location VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    severity INT NOT NULL,
+    timestamp DATETIME NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    INDEX idx_status (status),
+    INDEX idx_severity (severity)
+);
+
+-- Create Weather Alert Table
+CREATE TABLE IF NOT EXISTS weather_alerts (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    alert_type VARCHAR(100) NOT NULL,
+    description TEXT NOT NULL,
+    severity INT NOT NULL,
+    timestamp DATETIME NOT NULL,
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    INDEX idx_active (active),
+    INDEX idx_severity (severity)
 );
