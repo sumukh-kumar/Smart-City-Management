@@ -2,7 +2,8 @@ package com.example.model;
 
 import io.github.cdimascio.dotenv.Dotenv;
 
-import java.sql.*;
+// Add this import at the top of the file with other imports
+import java.sql.DatabaseMetaData;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -311,5 +312,69 @@ public class SafetyService {
             e.printStackTrace();
             return Optional.empty();
         }
+    }
+}
+
+// Add this method after the getConnection() method
+
+/**
+ * Verifies that the required database tables exist and creates them if they don't
+ * @return true if verification/creation was successful
+ */
+public boolean verifyDatabaseTables() {
+    try (Connection conn = getConnection()) {
+        // Check if tables exist
+        DatabaseMetaData meta = conn.getMetaData();
+        boolean emergencyTableExists = false;
+        boolean weatherTableExists = false;
+        
+        try (ResultSet tables = meta.getTables(null, null, EMERGENCY_TABLE, null)) {
+            emergencyTableExists = tables.next();
+        }
+        
+        try (ResultSet tables = meta.getTables(null, null, WEATHER_TABLE, null)) {
+            weatherTableExists = tables.next();
+        }
+        
+        // Create tables if they don't exist
+        if (!emergencyTableExists) {
+            try (Statement stmt = conn.createStatement()) {
+                String sql = "CREATE TABLE IF NOT EXISTS " + EMERGENCY_TABLE + " (" +
+                    "`id` BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                    "`type` VARCHAR(100) NOT NULL, " +
+                    "`location` VARCHAR(255) NOT NULL, " +
+                    "`description` TEXT NOT NULL, " +
+                    "`severity` INT NOT NULL, " +
+                    "`timestamp` DATETIME NOT NULL, " +
+                    "`status` VARCHAR(20) NOT NULL DEFAULT 'PENDING', " +
+                    "INDEX idx_status (status), " +
+                    "INDEX idx_severity (severity)" +
+                    ")";
+                stmt.executeUpdate(sql);
+                System.out.println("Created emergency table: " + EMERGENCY_TABLE);
+            }
+        }
+        
+        if (!weatherTableExists) {
+            try (Statement stmt = conn.createStatement()) {
+                String sql = "CREATE TABLE IF NOT EXISTS " + WEATHER_TABLE + " (" +
+                    "`id` BIGINT AUTO_INCREMENT PRIMARY KEY, " +
+                    "`alert_type` VARCHAR(100) NOT NULL, " +
+                    "`description` TEXT NOT NULL, " +
+                    "`severity` INT NOT NULL, " +
+                    "`timestamp` DATETIME NOT NULL, " +
+                    "`active` BOOLEAN NOT NULL DEFAULT TRUE, " +
+                    "INDEX idx_active (active), " +
+                    "INDEX idx_severity (severity)" +
+                    ")";
+                stmt.executeUpdate(sql);
+                System.out.println("Created weather alert table: " + WEATHER_TABLE);
+            }
+        }
+        
+        return true;
+    } catch (SQLException e) {
+        e.printStackTrace();
+        return false;
     }
 }

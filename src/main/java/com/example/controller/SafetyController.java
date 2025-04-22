@@ -75,6 +75,7 @@ public class SafetyController {
             view.showNotification("Emergency created successfully", false);
             view.clearEmergencyForm();
             refreshEmergencyList();
+            view.playEmergencyAlert(); // Play alert sound for emergencies
         } else {
             view.showNotification("Failed to create emergency", true);
         }
@@ -160,9 +161,9 @@ public class SafetyController {
                 alert.getTimestamp().format(DATE_TIME_FORMATTER),
                 alert.getDescription()
             );
-            view.setLatestAlertInfo(alertInfo);
+            view.setLatestAlertInfo(alertInfo, alert.getAlertType()); // Pass the alert type for styling
         } else {
-            view.setLatestAlertInfo("No weather alerts available.");
+            view.setLatestAlertInfo("No weather alerts available.", null);
         }
     }
 }

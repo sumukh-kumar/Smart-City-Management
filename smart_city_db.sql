@@ -23,3 +23,30 @@ CREATE TABLE IF NOT EXISTS `power_stats` (
     `average_consumption` DOUBLE NOT NULL,
     `last_updated` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+
+-- Add after your existing power_readings and power_stats tables
+
+-- Create table for emergency alerts
+CREATE TABLE IF NOT EXISTS `emergencies` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `type` VARCHAR(100) NOT NULL,
+    `location` VARCHAR(255) NOT NULL,
+    `description` TEXT NOT NULL,
+    `severity` INT NOT NULL,
+    `timestamp` DATETIME NOT NULL,
+    `status` VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    INDEX idx_status (status),
+    INDEX idx_severity (severity)
+);
+
+-- Create table for weather alerts
+CREATE TABLE IF NOT EXISTS `weather_alerts` (
+    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
+    `alert_type` VARCHAR(100) NOT NULL,
+    `description` TEXT NOT NULL,
+    `severity` INT NOT NULL,
+    `timestamp` DATETIME NOT NULL,
+    `active` BOOLEAN NOT NULL DEFAULT TRUE,
+    INDEX idx_active (active),
+    INDEX idx_severity (severity)
+);
