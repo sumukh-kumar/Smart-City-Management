@@ -1,3 +1,4 @@
+
 package com.example;
 
 import com.example.model.Emergency;
@@ -403,4 +404,5 @@ public class PublicSafetyManagementView extends VerticalLayout {
             "audio.play();"
         );
     }
+
 }

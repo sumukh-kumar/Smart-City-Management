@@ -1,4 +1,16 @@
 if error do this mvn dependency:copy-dependencies
+RUNNING TRAFFIC DATA GENERATOR
+Compile
+javac -cp "target/dependency/*" .\data_gen\TrafficDataGenerator.java
+run
+java -cp "data_gen;target\dependency\*" TrafficDataGenerator
+
+
+for MACOS:
+javac -cp "target/dependency/*" data_gen/TrafficDataGenerator.java 
+java -cp "data_gen:target/dependency/*" TrafficDataGenerator 
+
+RUNNING UTILITY DATA GENERATOR
 Compile
 cd "c:\Users\sumuk\OneDrive\Desktop\Pes Notes\sem-6\ooad_proj\smart-city-management"
 javac -cp "target/dependency/*" data_gen/UtilityDataGenerator.java
