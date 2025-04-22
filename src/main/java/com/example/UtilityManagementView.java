@@ -58,7 +58,7 @@ public class UtilityManagementView extends VerticalLayout {
         contentLayout.setSpacing(true); // Add spacing between the tracking and reporting sections
 
         // --- Tracking Section (Vertical Layout) ---
-        H3 trackingHeader = new H3("Live Tracking & Fault Detection");
+        H3 trackingHeader = new H3("Tracking & Fault Detection");
         VerticalLayout trackingSection = new VerticalLayout(trackingHeader);
         trackingSection.setPadding(true);
         trackingSection.setSpacing(true);
@@ -68,7 +68,7 @@ public class UtilityManagementView extends VerticalLayout {
         trackingSection.getStyle().set("border", "1px solid var(--lumo-contrast-10pct)");
         trackingSection.getStyle().set("border-radius", "var(--lumo-border-radius-m)");
 
-        trackButton = new Button("Start Tracking");
+        trackButton = new Button("Refresh");
         trackButton.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
         trackingOutput = new TextArea("Status");
