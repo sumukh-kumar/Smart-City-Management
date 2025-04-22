@@ -14,7 +14,6 @@ import java.util.Optional;
 
 public class EnvironmentalService {
 
-    // --- Load Environment Variables ---
     private static final Dotenv dotenv;
     private static final String DB_URL;
     private static final String DB_USER;
@@ -24,21 +23,18 @@ public class EnvironmentalService {
 
     static {
         try {
-            // Load .env file
             dotenv = Dotenv.configure().ignoreIfMissing().load();
 
             DB_URL = dotenv.get("DB_URL");
             DB_USER = dotenv.get("DB_USER");
             DB_PASSWORD = dotenv.get("DB_PASSWORD");
-            AIR_QUALITY_TABLE = "air_quality_readings"; // Table name for air quality data
-            NOISE_LEVEL_TABLE = "noise_level_readings"; // Table name for noise level data
+            AIR_QUALITY_TABLE = "air_quality_readings";
+            NOISE_LEVEL_TABLE = "noise_level_readings";
 
-            // Basic validation
             if (DB_URL == null || DB_USER == null || DB_PASSWORD == null) {
                 throw new RuntimeException("Error: One or more required environment variables (DB_URL, DB_USER, DB_PASSWORD) are missing. Check .env file or system environment.");
             }
 
-            // Load the MySQL JDBC driver
             Class.forName("com.mysql.cj.jdbc.Driver");
 
         } catch (RuntimeException e) {
@@ -54,11 +50,9 @@ public class EnvironmentalService {
         }
     }
 
-    // Singleton pattern
     private static EnvironmentalService instance;
 
     private EnvironmentalService() {
-        // Empty constructor
     }
 
     public static synchronized EnvironmentalService getInstance() {
@@ -68,16 +62,10 @@ public class EnvironmentalService {
         return instance;
     }
 
-    // Helper method to get a database connection
     private Connection getConnection() throws SQLException {
         return DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
     }
 
-    // --- Air Quality Monitoring Methods ---
-
-    /**
-     * Represents an air quality reading with location and pollution data
-     */
     public static class AirQualityReading {
         private int id;
         private LocalDateTime timestamp;
@@ -87,9 +75,9 @@ public class EnvironmentalService {
         private double ozoneLevel;
         private String qualityIndex;
 
-        public AirQualityReading(int id, LocalDateTime timestamp, String location, 
-                                double pm25Level, double pm10Level, double ozoneLevel, 
-                                String qualityIndex) {
+        public AirQualityReading(int id, LocalDateTime timestamp, String location,
+                                 double pm25Level, double pm10Level, double ozoneLevel,
+                                 String qualityIndex) {
             this.id = id;
             this.timestamp = timestamp;
             this.location = location;
@@ -99,7 +87,6 @@ public class EnvironmentalService {
             this.qualityIndex = qualityIndex;
         }
 
-        // Getters
         public int getId() { return id; }
         public LocalDateTime getTimestamp() { return timestamp; }
         public String getLocation() { return location; }
@@ -109,9 +96,6 @@ public class EnvironmentalService {
         public String getQualityIndex() { return qualityIndex; }
     }
 
-    /**
-     * Represents a noise level reading with location and decibel data
-     */
     public static class NoiseLevelReading {
         private int id;
         private LocalDateTime timestamp;
@@ -120,8 +104,8 @@ public class EnvironmentalService {
         private String zoneType;
         private boolean exceedsLimit;
 
-        public NoiseLevelReading(int id, LocalDateTime timestamp, String location, 
-                                double decibelLevel, String zoneType, boolean exceedsLimit) {
+        public NoiseLevelReading(int id, LocalDateTime timestamp, String location,
+                                 double decibelLevel, String zoneType, boolean exceedsLimit) {
             this.id = id;
             this.timestamp = timestamp;
             this.location = location;
@@ -130,7 +114,6 @@ public class EnvironmentalService {
             this.exceedsLimit = exceedsLimit;
         }
 
-        // Getters
         public int getId() { return id; }
         public LocalDateTime getTimestamp() { return timestamp; }
         public String getLocation() { return location; }
@@ -139,16 +122,12 @@ public class EnvironmentalService {
         public boolean isExceedsLimit() { return exceedsLimit; }
     }
 
-    /**
-     * Gets the latest air quality readings from all monitored locations
-     * @return Map of location names to their latest air quality readings
-     */
     public Map<String, AirQualityReading> getLatestAirQualityReadings() {
         Map<String, AirQualityReading> latestReadings = new HashMap<>();
-        
-        String sql = "SELECT * FROM " + AIR_QUALITY_TABLE + 
+
+        String sql = "SELECT * FROM " + AIR_QUALITY_TABLE +
                      " WHERE (location, timestamp) IN " +
-                     "(SELECT location, MAX(timestamp) FROM " + AIR_QUALITY_TABLE + 
+                     "(SELECT location, MAX(timestamp) FROM " + AIR_QUALITY_TABLE +
                      " GROUP BY location)";
 
         try (Connection conn = getConnection();
@@ -172,22 +151,17 @@ public class EnvironmentalService {
 
         } catch (SQLException e) {
             e.printStackTrace();
-            // Return empty map on error
         }
 
         return latestReadings;
     }
 
-    /**
-     * Gets the latest noise level readings from all monitored locations
-     * @return List of the latest noise level readings
-     */
     public List<NoiseLevelReading> getLatestNoiseLevelReadings() {
         List<NoiseLevelReading> readings = new ArrayList<>();
-        
-        String sql = "SELECT * FROM " + NOISE_LEVEL_TABLE + 
+
+        String sql = "SELECT * FROM " + NOISE_LEVEL_TABLE +
                      " WHERE (location, timestamp) IN " +
-                     "(SELECT location, MAX(timestamp) FROM " + NOISE_LEVEL_TABLE + 
+                     "(SELECT location, MAX(timestamp) FROM " + NOISE_LEVEL_TABLE +
                      " GROUP BY location)";
 
         try (Connection conn = getConnection();
@@ -210,31 +184,24 @@ public class EnvironmentalService {
 
         } catch (SQLException e) {
             e.printStackTrace();
-            // Return empty list on error
         }
 
         return readings;
     }
 
-    /**
-     * Gets air quality alerts for readings that exceed safe thresholds
-     * @param daysBack Number of days to look back for alerts
-     * @return List of air quality readings that triggered alerts
-     */
     public List<AirQualityReading> getAirQualityAlerts(int daysBack) {
         List<AirQualityReading> alerts = new ArrayList<>();
         LocalDateTime cutoffDate = LocalDateTime.now().minusDays(daysBack);
-        
-        // Query for readings with poor or hazardous quality index in the specified time period
-        String sql = "SELECT * FROM " + AIR_QUALITY_TABLE + 
+
+        String sql = "SELECT * FROM " + AIR_QUALITY_TABLE +
                      " WHERE timestamp >= ? AND (quality_index = 'Poor' OR quality_index = 'Hazardous')" +
                      " ORDER BY timestamp DESC";
 
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
+
             pstmt.setTimestamp(1, Timestamp.valueOf(cutoffDate));
-            
+
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
                     int id = rs.getInt("id");
@@ -254,30 +221,24 @@ public class EnvironmentalService {
 
         } catch (SQLException e) {
             e.printStackTrace();
-            // Return empty list on error
         }
 
         return alerts;
     }
 
-    /**
-     * Gets noise pollution violations (readings that exceed limits for their zone)
-     * @param daysBack Number of days to look back for violations
-     * @return List of noise level readings that exceed limits
-     */
     public List<NoiseLevelReading> getNoiseViolations(int daysBack) {
         List<NoiseLevelReading> violations = new ArrayList<>();
         LocalDateTime cutoffDate = LocalDateTime.now().minusDays(daysBack);
-        
-        String sql = "SELECT * FROM " + NOISE_LEVEL_TABLE + 
+
+        String sql = "SELECT * FROM " + NOISE_LEVEL_TABLE +
                      " WHERE timestamp >= ? AND exceeds_limit = true" +
                      " ORDER BY timestamp DESC";
 
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
+
             pstmt.setTimestamp(1, Timestamp.valueOf(cutoffDate));
-            
+
             try (ResultSet rs = pstmt.executeQuery()) {
                 while (rs.next()) {
                     int id = rs.getInt("id");
@@ -296,56 +257,42 @@ public class EnvironmentalService {
 
         } catch (SQLException e) {
             e.printStackTrace();
-            // Return empty list on error
         }
 
         return violations;
     }
 
-    /**
-     * Deletes old environmental data before the specified number of days
-     * @param daysToKeep Number of days of data to retain
-     * @return Message indicating the result of the operation
-     */
     public String deleteOldEnvironmentalData(int daysToKeep) {
         LocalDateTime cutoffDate = LocalDateTime.now().minusDays(daysToKeep);
         int airQualityRowsDeleted = 0;
         int noiseLevelRowsDeleted = 0;
-        
+
         try (Connection conn = getConnection()) {
-            // Delete old air quality data
             String airQualitySql = "DELETE FROM " + AIR_QUALITY_TABLE + " WHERE timestamp < ?";
             try (PreparedStatement pstmt = conn.prepareStatement(airQualitySql)) {
                 pstmt.setTimestamp(1, Timestamp.valueOf(cutoffDate));
                 airQualityRowsDeleted = pstmt.executeUpdate();
             }
-            
-            // Delete old noise level data
+
             String noiseLevelSql = "DELETE FROM " + NOISE_LEVEL_TABLE + " WHERE timestamp < ?";
             try (PreparedStatement pstmt = conn.prepareStatement(noiseLevelSql)) {
                 pstmt.setTimestamp(1, Timestamp.valueOf(cutoffDate));
                 noiseLevelRowsDeleted = pstmt.executeUpdate();
             }
-            
+
         } catch (SQLException e) {
             e.printStackTrace();
             return "Error deleting old environmental data: " + e.getMessage();
         }
-        
+
         return String.format("Successfully deleted %d air quality readings and %d noise level readings older than %s.",
-                airQualityRowsDeleted, noiseLevelRowsDeleted, 
+                airQualityRowsDeleted, noiseLevelRowsDeleted,
                 cutoffDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
     }
 
-    /**
-     * Generates a summary report of air quality for a specific location
-     * @param location The location to generate the report for
-     * @param daysBack Number of days to include in the report
-     * @return A formatted report string
-     */
     public String generateAirQualityReport(String location, int daysBack) {
         LocalDateTime cutoffDate = LocalDateTime.now().minusDays(daysBack);
-        
+
         String sql = "SELECT AVG(pm25_level) as avg_pm25, AVG(pm10_level) as avg_pm10, " +
                      "AVG(ozone_level) as avg_ozone, COUNT(*) as reading_count, " +
                      "SUM(CASE WHEN quality_index = 'Good' THEN 1 ELSE 0 END) as good_count, " +
@@ -353,13 +300,13 @@ public class EnvironmentalService {
                      "SUM(CASE WHEN quality_index = 'Poor' THEN 1 ELSE 0 END) as poor_count, " +
                      "SUM(CASE WHEN quality_index = 'Hazardous' THEN 1 ELSE 0 END) as hazardous_count " +
                      "FROM " + AIR_QUALITY_TABLE + " WHERE location = ? AND timestamp >= ?";
-        
+
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-            
+
             pstmt.setString(1, location);
             pstmt.setTimestamp(2, Timestamp.valueOf(cutoffDate));
-            
+
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
                     double avgPm25 = rs.getDouble("avg_pm25");
@@ -370,11 +317,11 @@ public class EnvironmentalService {
                     int moderateCount = rs.getInt("moderate_count");
                     int poorCount = rs.getInt("poor_count");
                     int hazardousCount = rs.getInt("hazardous_count");
-                    
+
                     if (readingCount == 0) {
                         return "No air quality data available for " + location + " in the last " + daysBack + " days.";
                     }
-                    
+
                     return String.format(
                         "Air Quality Report for %s (Last %d Days):\n" +
                         "--------------------------------------------------\n" +
@@ -383,10 +330,10 @@ public class EnvironmentalService {
                         "Average PM10 Level: %.2f μg/m³\n" +
                         "Average Ozone Level: %.2f ppb\n\n" +
                         "Quality Index Distribution:\n" +
-                        "  Good: %d (%.1f%%)\n" +
-                        "  Moderate: %d (%.1f%%)\n" +
-                        "  Poor: %d (%.1f%%)\n" +
-                        "  Hazardous: %d (%.1f%%)\n" +
+                        "  Good: %d (%.1f%%)\n" +
+                        "  Moderate: %d (%.1f%%)\n" +
+                        "  Poor: %d (%.1f%%)\n" +
+                        "  Hazardous: %d (%.1f%%)\n" +
                         "--------------------------------------------------",
                         location, daysBack, readingCount, avgPm25, avgPm10, avgOzone,
                         goodCount, (goodCount * 100.0 / readingCount),
@@ -398,7 +345,7 @@ public class EnvironmentalService {
                     return "No air quality data available for " + location + " in the last " + daysBack + " days.";
                 }
             }
-            
+
         } catch (SQLException e) {
             e.printStackTrace();
             return "Error generating air quality report: " + e.getMessage();

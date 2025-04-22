@@ -4,7 +4,6 @@ import java.sql.Timestamp;
 import java.time.LocalDateTime;
 
 public class JunctionState {
-    // private int id; // Removed id field
     private String junctionId;
     private int lane1Vehicles;
     private int lane2Vehicles;
@@ -13,9 +12,7 @@ public class JunctionState {
     private int greenLaneId;
     private LocalDateTime lastUpdated;
 
-    // Constructor - Removed id parameter
     public JunctionState(String junctionId, int lane1Vehicles, int lane2Vehicles, int lane3Vehicles, int lane4Vehicles, int greenLaneId, Timestamp lastUpdatedTimestamp) {
-        // this.id = id; // Removed assignment
         this.junctionId = junctionId;
         this.lane1Vehicles = lane1Vehicles;
         this.lane2Vehicles = lane2Vehicles;
@@ -25,8 +22,6 @@ public class JunctionState {
         this.lastUpdated = (lastUpdatedTimestamp != null) ? lastUpdatedTimestamp.toLocalDateTime() : null;
     }
 
-    // Getters - Removed getId()
-    // public int getId() { return id; }
     public String getJunctionId() { return junctionId; }
     public int getLane1Vehicles() { return lane1Vehicles; }
     public int getLane2Vehicles() { return lane2Vehicles; }
@@ -38,14 +33,13 @@ public class JunctionState {
     @Override
     public String toString() {
         return "JunctionState{" +
-               // "id=" + id + // Removed id from toString
-               "junctionId='" + junctionId + '\'' +
-               ", lane1Vehicles=" + lane1Vehicles +
-               ", lane2Vehicles=" + lane2Vehicles +
-               ", lane3Vehicles=" + lane3Vehicles +
-               ", lane4Vehicles=" + lane4Vehicles +
-               ", greenLaneId=" + greenLaneId +
-               ", lastUpdated=" + lastUpdated +
-               '}';
+                "junctionId='" + junctionId + '\'' +
+                ", lane1Vehicles=" + lane1Vehicles +
+                ", lane2Vehicles=" + lane2Vehicles +
+                ", lane3Vehicles=" + lane3Vehicles +
+                ", lane4Vehicles=" + lane4Vehicles +
+                ", greenLaneId=" + greenLaneId +
+                ", lastUpdated=" + lastUpdated +
+                '}';
     }
 }

@@ -9,7 +9,6 @@ public class ParkingSpot {
     private boolean occupied;
     private LocalDateTime lastUpdated;
 
-    // Constructor
     public ParkingSpot(String spotId, String locationDescription, boolean occupied, Timestamp lastUpdated) {
         this.spotId = spotId;
         this.locationDescription = locationDescription;
@@ -17,7 +16,6 @@ public class ParkingSpot {
         this.lastUpdated = (lastUpdated != null) ? lastUpdated.toLocalDateTime() : null;
     }
 
-    // Getters
     public String getSpotId() {
         return spotId;
     }
@@ -37,10 +35,10 @@ public class ParkingSpot {
     @Override
     public String toString() {
         return "ParkingSpot{" +
-               "spotId='" + spotId + '\'' +
-               ", locationDescription='" + locationDescription + '\'' +
-               ", occupied=" + occupied +
-               ", lastUpdated=" + lastUpdated +
-               '}';
+                "spotId='" + spotId + '\'' +
+                ", locationDescription='" + locationDescription + '\'' +
+                ", occupied=" + occupied +
+                ", lastUpdated=" + lastUpdated +
+                '}';
     }
 }
