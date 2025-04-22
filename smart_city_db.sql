@@ -65,3 +65,27 @@ CREATE TABLE IF NOT EXISTS parking_spots (
 -- ('P1-A03', 'Main St Lot, Row A, Spot 03', FALSE),
 -- ('DG-1A-01', 'Downtown Garage, Level 1A, Spot 01', FALSE)
 -- ON DUPLICATE KEY UPDATE spot_id=spot_id; -- Avoid errors if run multiple times
+-- Air Quality Readings Table
+CREATE TABLE air_quality_readings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    timestamp DATETIME NOT NULL,
+    location VARCHAR(100) NOT NULL,
+    pm25_level DOUBLE NOT NULL,
+    pm10_level DOUBLE NOT NULL,
+    ozone_level DOUBLE NOT NULL,
+    quality_index VARCHAR(20) NOT NULL,
+    INDEX idx_location (location),
+    INDEX idx_timestamp (timestamp)
+);
+
+-- Noise Level Readings Table
+CREATE TABLE noise_level_readings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    timestamp DATETIME NOT NULL,
+    location VARCHAR(100) NOT NULL,
+    decibel_level DOUBLE NOT NULL,
+    zone_type VARCHAR(50) NOT NULL,
+    exceeds_limit BOOLEAN NOT NULL,
+    INDEX idx_location (location),
+    INDEX idx_timestamp (timestamp)
+);
