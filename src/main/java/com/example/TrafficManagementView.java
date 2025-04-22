@@ -10,7 +10,6 @@ import com.vaadin.flow.component.ComponentEventListener;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.html.H2;
-import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Paragraph;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.Notification;
@@ -26,21 +25,17 @@ import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Route("traffic")
 @PageTitle("Traffic & Parking Management")
 public class TrafficManagementView extends VerticalLayout {
-
     private final Button refreshButton;
     private final Button parkingButton;
-    private final Button deleteButton;
     private final Button backButton;
     private final VerticalLayout junctionDisplayLayout;
     private final VerticalLayout parkingDisplayLayout;
 
     private static final DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-
 
     public TrafficManagementView() {
         addClassName("traffic-view");
@@ -71,15 +66,12 @@ public class TrafficManagementView extends VerticalLayout {
                 .set("max-height", "400px")
                 .set("overflow-y", "auto");
 
-
         refreshButton = new Button("Refresh Data");
         parkingButton = new Button("Show Parking");
-        deleteButton = new Button("Delete Old Junction Data");
-        deleteButton.addThemeVariants(ButtonVariant.LUMO_ERROR);
         backButton = new Button("Back to Main Menu");
         backButton.addClickListener(e -> backButton.getUI().ifPresent(ui -> ui.navigate("")));
 
-        HorizontalLayout buttonBar = new HorizontalLayout(refreshButton, parkingButton, deleteButton, backButton);
+        HorizontalLayout buttonBar = new HorizontalLayout(refreshButton, parkingButton, backButton);
         buttonBar.setSpacing(true);
 
         VerticalLayout contentBox = new VerticalLayout(
@@ -120,7 +112,7 @@ public class TrafficManagementView extends VerticalLayout {
                     junctionLayout.getStyle().set("border", "1px solid #eee").set("padding", "10px").set("margin-bottom", "10px");
 
                     junctionLayout.add(new Span("Junction: " + state.getJunctionId() +
-                                                " (Updated: " + (state.getLastUpdated() != null ? state.getLastUpdated().format(dtf) : "N/A") + ")"));
+                            " (Updated: " + (state.getLastUpdated() != null ? state.getLastUpdated().format(dtf) : "N/A") + ")"));
 
                     HorizontalLayout lanesLayout = new HorizontalLayout();
                     lanesLayout.setSpacing(true);
@@ -173,7 +165,6 @@ public class TrafficManagementView extends VerticalLayout {
         H2 parkingHeader = new H2(String.format("Parking Availability (%d / %d Available)", availableCount, totalCount));
         parkingDisplayLayout.add(parkingHeader);
 
-
         spots.stream()
                 .sorted(Comparator.comparing(ParkingSpot::getSpotId))
                 .forEach(spot -> {
@@ -201,12 +192,12 @@ public class TrafficManagementView extends VerticalLayout {
                     }
 
                     String description = spot.getLocationDescription() != null && !spot.getLocationDescription().isEmpty()
-                                         ? " (" + spot.getLocationDescription() + ")" : "";
+                            ? " (" + spot.getLocationDescription() + ")" : "";
                     Span spotIdSpan = new Span(spot.getSpotId() + description);
                     spotIdSpan.getStyle().set("flex-grow", "1");
 
                     String updatedTime = spot.getLastUpdated() != null
-                                         ? spot.getLastUpdated().format(dtf) : "N/A";
+                            ? spot.getLastUpdated().format(dtf) : "N/A";
                     Span timeSpan = new Span("Updated: " + updatedTime);
                     timeSpan.getStyle().set("font-size", "small").set("color", "gray");
 
@@ -231,9 +222,5 @@ public class TrafficManagementView extends VerticalLayout {
 
     public void addParkingButtonListener(ComponentEventListener<ClickEvent<Button>> listener) {
         parkingButton.addClickListener(listener);
-    }
-
-    public void addDeleteButtonListener(ComponentEventListener<ClickEvent<Button>> listener) {
-        deleteButton.addClickListener(listener);
     }
 }

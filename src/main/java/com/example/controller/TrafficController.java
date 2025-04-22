@@ -23,7 +23,7 @@ public class TrafficController {
 
         this.view.addRefreshButtonListener(e -> handleRefreshClick());
         this.view.addParkingButtonListener(e -> handleParkingClick());
-        this.view.addDeleteButtonListener(e -> handleDeleteJunctionStatesClick());
+        //this.view.addDeleteButtonListener(e -> handleDeleteJunctionStatesClick());
 
         handleRefreshClick();
     }

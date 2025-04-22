@@ -70,20 +70,21 @@ public class TrafficService {
 
     public Map<String, JunctionState> getLatestJunctionStates() {
         Map<String, JunctionState> latestStates = new HashMap<>();
+        // Alternative SQL using a correlated subquery
         String sql = String.format(
             "SELECT t1.junction_id, t1.lane_1_vehicles, t1.lane_2_vehicles, t1.lane_3_vehicles, t1.lane_4_vehicles, t1.green_lane_id, t1.last_updated " +
             "FROM %s t1 " +
-            "INNER JOIN (" +
-            "    SELECT junction_id, MAX(last_updated) AS max_last_updated " +
-            "    FROM %s " +
-            "    GROUP BY junction_id" +
-            ") t2 ON t1.junction_id = t2.junction_id AND t1.last_updated = t2.max_last_updated",
+            "WHERE t1.last_updated = (" +
+            "   SELECT MAX(t2.last_updated) " +
+            "   FROM %s t2 " +
+            "   WHERE t2.junction_id = t1.junction_id" +
+            ")",
             JUNCTION_TABLE_NAME, JUNCTION_TABLE_NAME);
-
+    
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql);
              ResultSet rs = pstmt.executeQuery()) {
-
+    
             while (rs.next()) {
                 JunctionState state = new JunctionState(
                         rs.getString("junction_id"),
@@ -99,6 +100,8 @@ public class TrafficService {
         } catch (SQLException e) {
             System.err.println("Error fetching latest junction states: " + e.getMessage());
             e.printStackTrace();
+            // Consider re-throwing or handling the exception more robustly
+            // throw new RuntimeException("Failed to fetch latest junction states", e);
         }
         return latestStates;
     }

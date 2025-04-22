@@ -62,7 +62,7 @@ public class SafetyService {
     // Singleton pattern
     private static SafetyService instance;
 
-    private SafetyService() {
+    private SafetyService() { 
         // Constructor is empty, initialization happens in static block
     }
 
