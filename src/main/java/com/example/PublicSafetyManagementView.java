@@ -211,8 +211,22 @@ public class PublicSafetyManagementView extends VerticalLayout {
         // Add components to main layout
         add(title, tabs, new Hr(), dataManagementLayout);
         
+        // Initialize service and verify database tables
+        SafetyService safetyService = SafetyService.getInstance();
+        boolean tablesVerified = safetyService.verifyDatabaseTables();
+        if (tablesVerified) {
+            Notification.show("Database tables verified successfully", 3000, Notification.Position.BOTTOM_START);
+        } else {
+            Notification.show("Failed to verify database tables. Check console for details.", 
+                             5000, Notification.Position.BOTTOM_START)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+        }
+        
         // Initialize controller
-        new SafetyController(SafetyService.getInstance(), this);
+        new SafetyController(safetyService, this);
+        
+        // Style the emergency grid
+        styleEmergencyGrid();
     }
     
     // --- Methods for Controller Interaction ---

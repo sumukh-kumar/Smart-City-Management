@@ -128,9 +128,14 @@ public class SafetyController {
     }
 
     private void handleRefresh() {
-        refreshEmergencyList();
-        refreshWeatherAlerts();
-        view.showNotification("Data refreshed", false);
+        try {
+            refreshEmergencyList();
+            refreshWeatherAlerts();
+            view.showNotification("Data refreshed successfully", false);
+        } catch (Exception e) {
+            view.showNotification("Error refreshing data: " + e.getMessage(), true);
+            e.printStackTrace();
+        }
     }
 
     private void handleDeleteOldData() {
